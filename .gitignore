@@ -1,0 +1,56 @@
+# ========================================================
+# Unity Standard .gitignore
+# ========================================================
+
+# Unity Otomatik Üretilen Geçici Klasörler (Asla Git'e Gitmez)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Asset meta dosyaları korunmalıdır (Sadece var olan asset'in meta'sı tutulur)
+!/[Aa]ssets/**/*.meta
+
+# JetBrains Rider / Visual Studio geçici dosyaları
+.vs/
+.idea/
+.gradle/
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity çökme ve raporlama dosyaları
+sysinfo.txt
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Çıktı Paketleri
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# İşletim sistemi çöpleri
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
