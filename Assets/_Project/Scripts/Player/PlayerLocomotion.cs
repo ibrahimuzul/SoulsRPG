@@ -51,6 +51,7 @@ namespace SoulsRPG.Player
         // Movement State
         private Vector3 moveDirection;
         private Vector3 rollDirection;
+        private Vector3 lastInputVector;
         private float verticalVelocity;
         private bool isGrounded;
         private bool isRolling;
@@ -63,9 +64,12 @@ namespace SoulsRPG.Player
 
         [Header("Weapon & Damage Settings")]
         [SerializeField] private int attackDamage = 35;
-        [SerializeField] private float attackWindupTime = 0.20f;
-        [SerializeField] private float attackActiveTime = 0.32f;
-        [SerializeField] private float attackRecoveryTime = 0.33f;
+        [Tooltip("Geriye çekilme süresi: Silah omuz arkasına kalkana kadar hasar kapalıdır (Yeşil)")]
+        [SerializeField] private float attackWindupTime = 0.48f;
+        [Tooltip("Öne savurma süresi: Silah öne doğru savrulurken hasar açıktır (Kırmızı)")]
+        [SerializeField] private float attackActiveTime = 0.44f;
+        [Tooltip("Savurma bittikten sonra garda dönüş süresi (Yeşil)")]
+        [SerializeField] private float attackRecoveryTime = 0.22f;
         private Combat.WeaponDamageCollider weaponCollider;
 
         public bool IsRolling => isRolling;
@@ -179,6 +183,28 @@ namespace SoulsRPG.Player
 
             CheckGrounded();
 
+            // Dark Souls Saldırı Kuralı: Kılıç/silah sallarken yürünemez ve koşulamaz! (Attack Commitment)
+            if (isAttacking)
+            {
+                isSprinting = false;
+                if (animator != null)
+                {
+                    animator.SetFloat("Speed", 0f, 0.1f, Time.deltaTime);
+                }
+
+                // Sadece yerçekimi uygula (ayaklar yere sağlam bassın)
+                if (isGrounded && verticalVelocity < 0f)
+                {
+                    verticalVelocity = -2f;
+                }
+                else
+                {
+                    verticalVelocity += gravity * Time.deltaTime;
+                }
+                characterController.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
+                return;
+            }
+
             // Calculate movement vector relative to camera
             Vector3 camForward = mainCamera.transform.forward;
             Vector3 camRight = mainCamera.transform.right;
@@ -188,6 +214,7 @@ namespace SoulsRPG.Player
             camRight.Normalize();
 
             Vector3 inputVector = (camForward * vertical + camRight * horizontal).normalized;
+            lastInputVector = inputVector;
 
             // Handle Sprinting (Cannot sprint while blocking)
             isSprinting = sprintInput && !isBlocking && inputVector.magnitude > 0.1f && playerStats.HasStamina(5f);
@@ -273,7 +300,7 @@ namespace SoulsRPG.Player
 
         public void AttemptDodgeRoll(float horizontal, float vertical)
         {
-            if (playerStats.isDead || isRolling || isStaggered) return;
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking) return;
 
             // Cancel blocking and attack collider when rolling
             SetBlocking(false);
@@ -288,6 +315,7 @@ namespace SoulsRPG.Player
             camRight.Normalize();
 
             Vector3 inputVector = (camForward * vertical + camRight * horizontal).normalized;
+            lastInputVector = inputVector;
 
             if (inputVector.magnitude > 0.1f)
             {
@@ -389,6 +417,14 @@ namespace SoulsRPG.Player
 
             if (playerStats.UseStamina(attackStaminaCost))
             {
+                // Saldırıya başlarken: Serbest bakışta hareket yönü varsa o yöne dönerek saldırıya başla
+                if (CameraManager.Instance == null || !CameraManager.Instance.IsLockedOn)
+                {
+                    if (lastInputVector.sqrMagnitude > 0.05f)
+                    {
+                        transform.rotation = Quaternion.LookRotation(lastInputVector);
+                    }
+                }
                 StartCoroutine(PerformAttackRoutine());
             }
         }
@@ -396,6 +432,7 @@ namespace SoulsRPG.Player
         private IEnumerator PerformAttackRoutine()
         {
             isAttacking = true;
+            isSprinting = false;
 
             // Ensure weapon collider reference is ready
             if (weaponCollider == null)
@@ -405,26 +442,21 @@ namespace SoulsRPG.Player
                 if (weaponCollider == null) weaponCollider = GetComponentInChildren<Combat.WeaponDamageCollider>();
             }
 
-            Vector3 attackStepDir = transform.forward;
-
             if (animator != null)
             {
+                animator.SetFloat("Speed", 0f);
                 animator.SetTrigger("isAttacking");
             }
 
-            // 1. Wind-up Delay (Silah geriye çekiliyor)
+            // 1. Wind-up Delay (Silah geriye çekiliyor - ayaklar yerde sabit)
             float elapsed = 0f;
             while (elapsed < attackWindupTime)
             {
                 elapsed += Time.deltaTime;
-                if (characterController != null && characterController.enabled)
-                {
-                    characterController.Move(attackStepDir * (1.5f * Time.deltaTime));
-                }
                 yield return null;
             }
 
-            // 2. Active Damage Window (Topuz savruluyor, hasar alanı AKTİF!)
+            // 2. Active Damage Window (Silah savruluyor, hasar alanı AKTİF! - ayaklar yerde sabit)
             if (weaponCollider != null)
             {
                 weaponCollider.EnableDamageCollider(attackDamage);
@@ -434,10 +466,6 @@ namespace SoulsRPG.Player
             while (elapsed < attackActiveTime)
             {
                 elapsed += Time.deltaTime;
-                if (characterController != null && characterController.enabled)
-                {
-                    characterController.Move(attackStepDir * (1.0f * Time.deltaTime));
-                }
                 yield return null;
             }
 

@@ -2642,6 +2642,10 @@ MonoBehaviour:
   backstepDuration: 0.5
   backstepSpeed: 6
   attackStaminaCost: 12
+  attackDamage: 35
+  attackWindupTime: 0.48
+  attackActiveTime: 0.44
+  attackRecoveryTime: 0.22
   blockVisualOffsetAngle: 30
   gravity: -20
   groundLayers:
@@ -3411,9 +3415,9 @@ MonoBehaviour:
   attackRange: 2.1
   gravity: -20
   attackDamage: 25
-  attackWindup: 0.3
-  attackActive: 0.35
-  attackRecovery: 0.4
+  attackWindup: 0.48
+  attackActive: 0.44
+  attackRecovery: 0.3
   attackCooldown: 1.8
   blockChance: 0.35
   blockMinDuration: 1.2

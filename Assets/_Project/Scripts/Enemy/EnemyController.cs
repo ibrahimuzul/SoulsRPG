@@ -46,9 +46,9 @@ namespace SoulsRPG.Enemy
 
         [Header("Attack Settings")]
         [SerializeField] private int attackDamage = 25;
-        [SerializeField] private float attackWindup = 0.30f;
-        [SerializeField] private float attackActive = 0.35f;
-        [SerializeField] private float attackRecovery = 0.40f;
+        [SerializeField] private float attackWindup = 0.48f;
+        [SerializeField] private float attackActive = 0.44f;
+        [SerializeField] private float attackRecovery = 0.30f;
         [SerializeField] private float attackCooldown = 1.8f;
 
         [Header("Shield & Defense")]
@@ -509,19 +509,16 @@ namespace SoulsRPG.Enemy
         {
             currentState = EnemyAIState.Attacking;
             SetBlocking(false);
+            SetAnimSpeed(0f); // Dark Souls kuralı: Saldırı anında yürüme/koşma hızı sıfırlanır
 
             if (navAgent != null && navAgent.isOnNavMesh)
             {
                 navAgent.ResetPath();
+                navAgent.velocity = Vector3.zero;
+                navAgent.isStopped = true;
             }
 
-            // Ensure weapon collider is attached
-            if (weaponCollider == null && equipmentManager != null)
-            {
-                weaponCollider = equipmentManager.GetWeaponCollider();
-            }
-
-            // Face player directly before swing
+            // Face player directly before swing (Saldırı başlangıcında hedefe dön, sonra savurma boyunca sabit kal)
             if (targetPlayer != null)
             {
                 Vector3 toPlayer = targetPlayer.position - transform.position;
@@ -537,21 +534,15 @@ namespace SoulsRPG.Enemy
                 animator.SetTrigger("isAttacking");
             }
 
-            Vector3 stepDir = transform.forward;
-
-            // 1. Wind-up (Savurma öncesi gerilme - oyuncu savuşturabilir veya kaçabilir)
+            // 1. Wind-up (Savurma öncesi gerilme - ayaklar yerde sabit)
             float elapsed = 0f;
             while (elapsed < attackWindup)
             {
                 elapsed += Time.deltaTime;
-                if (characterController != null && characterController.enabled)
-                {
-                    characterController.Move(stepDir * (1.2f * Time.deltaTime));
-                }
                 yield return null;
             }
 
-            // 2. Active Swing (Topuz savruluyor, hasar alanı AKTİF!)
+            // 2. Active Swing (Topuz savruluyor, hasar alanı AKTİF! - ayaklar yerde sabit)
             if (weaponCollider != null)
             {
                 weaponCollider.EnableDamageCollider(attackDamage);
@@ -561,10 +552,6 @@ namespace SoulsRPG.Enemy
             while (elapsed < attackActive)
             {
                 elapsed += Time.deltaTime;
-                if (characterController != null && characterController.enabled)
-                {
-                    characterController.Move(stepDir * (0.8f * Time.deltaTime));
-                }
                 yield return null;
             }
 
@@ -575,6 +562,11 @@ namespace SoulsRPG.Enemy
             }
 
             yield return new WaitForSeconds(attackRecovery);
+
+            if (navAgent != null && navAgent.isOnNavMesh)
+            {
+                navAgent.isStopped = false;
+            }
 
             attackCooldownTimer = attackCooldown;
             currentState = EnemyAIState.CombatStance;
