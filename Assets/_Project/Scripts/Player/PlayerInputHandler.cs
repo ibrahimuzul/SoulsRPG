@@ -62,7 +62,7 @@ namespace SoulsRPG.Player
 
         private void Start()
         {
-            cameraManager = CameraManager.Instance ?? FindFirstObjectByType<CameraManager>();
+            cameraManager = CameraManager.Instance ?? FindAnyObjectByType<CameraManager>();
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
@@ -109,7 +109,7 @@ namespace SoulsRPG.Player
 
             if (cameraManager == null)
             {
-                cameraManager = CameraManager.Instance ?? FindFirstObjectByType<CameraManager>();
+                cameraManager = CameraManager.Instance ?? FindAnyObjectByType<CameraManager>();
             }
 
             HandleMovement();
@@ -296,6 +296,7 @@ namespace SoulsRPG.Player
             GUILayout.Label($"<b>Sağ Kamera :</b> Yatay: <color=lime>Eksen 4</color> | Dikey: <color=lime>Eksen 7</color> <color=grey>[KİLİTLİ]</color>");
             GUILayout.Label($"<b>Tetikler   :</b> L2/R2: <color=red>Eksen 5 & 6</color> <color=red>[BLOKLANDI - KAMERAYI DÖNDÜREMEZ]</color>");
             GUILayout.Label($"<b>Sol Hareket:</b> Yatay: E1 ({moveH:F2}) | Dikey: E{moveVerticalAxis} ({moveV:F2})");
+            GUILayout.Label($"<b>Eylemler   :</b> Blok: {statusBlock} | Saldırı: {statusAttack} | Roll: {statusRoll} | Hedef: {statusLock}");
 
             GUILayout.Space(6);
             GUILayout.Label("<b>Canlı Eksenler:</b>");

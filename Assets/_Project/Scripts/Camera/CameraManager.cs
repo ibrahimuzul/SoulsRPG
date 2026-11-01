@@ -10,7 +10,6 @@ namespace SoulsRPG.CameraSystem
         [Header("Target Follow")]
         [SerializeField] private Transform target; // The Player
         [SerializeField] private Vector3 targetOffset = new Vector3(0f, 1.5f, 0f);
-        [SerializeField] private float followSpeed = 15f;
 
         [Header("Orbit Speeds & Limits")]
         [SerializeField] private float mouseSensitivityX = 150f;

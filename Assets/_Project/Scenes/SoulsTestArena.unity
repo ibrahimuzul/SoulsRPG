@@ -3359,7 +3359,7 @@ GameObject:
   - component: {fileID: 2119233901}
   - component: {fileID: 2119233900}
   m_Layer: 0
-  m_Name: TrainingDummy_Right
+  m_Name: Enemy_DarkKnight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3391,10 +3391,35 @@ MonoBehaviour:
   m_GameObject: {fileID: 2119233898}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 850a717d07136e644a7e6505b4799613, type: 3}
+  m_Script: {fileID: 11500000, guid: 9b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.Enemy.TrainingDummy
-  maxHealth: 150
+  m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.Enemy.EnemyController
+  enemyName: "Gezgin Kara \u015E\u00F6valye"
+  maxHealth: 120
+  soulsReward: 250
+  poise: 40
+  sightRange: 12
+  sightAngle: 130
+  hearingRange: 3.5
+  loseAggroDistance: 24
+  loseAggroTime: 4
+  walkSpeed: 2.2
+  chaseSpeed: 4.6
+  strafeSpeed: 1.8
+  rotationSpeed: 8
+  combatDistance: 3.8
+  attackRange: 2.1
+  gravity: -20
+  attackDamage: 25
+  attackWindup: 0.3
+  attackActive: 0.35
+  attackRecovery: 0.4
+  attackCooldown: 1.8
+  blockChance: 0.35
+  blockMinDuration: 1.2
+  blockMaxDuration: 2.4
+  autoRespawn: 1
+  respawnDelay: 5
 --- !u!114 &2119233901
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -20,7 +20,7 @@ namespace SoulsRPG.UI
         {
             if (playerStats == null)
             {
-                playerStats = FindFirstObjectByType<PlayerStats>();
+                playerStats = PlayerStats.Instance != null ? PlayerStats.Instance : FindAnyObjectByType<PlayerStats>();
             }
 
             if (playerStats != null)

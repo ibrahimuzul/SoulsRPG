@@ -9,6 +9,7 @@ namespace SoulsRPG.Combat
         [Header("Damage Settings")]
         [SerializeField] private int currentDamage = 35;
         [SerializeField] private float poiseDamage = 20f;
+        public float PoiseDamage => poiseDamage;
 
         [Header("Collider Setup")]
         [SerializeField] private BoxCollider hitCollider;
@@ -96,17 +97,18 @@ namespace SoulsRPG.Combat
                 return;
             }
 
-            // Düşmanı bul (Training Dummy veya gelecekteki düşmanlar)
-            var dummy = other.GetComponentInParent<TrainingDummy>();
-            if (dummy != null)
+            // Hasar alabilir bir hedef mi? (IDamageable: TrainingDummy, EnemyController, PlayerStats)
+            var damageable = other.GetComponentInParent<IDamageable>();
+            if (damageable != null && !damageable.IsDead)
             {
                 alreadyHitColliders.Add(other);
 
                 Vector3 hitPoint = other.ClosestPoint(transform.position);
-                Vector3 hitDirection = (dummy.transform.position - ownerRoot.position).normalized;
-                hitDirection.y = 0; // Yatay itme
+                Vector3 attackerPos = ownerRoot != null ? ownerRoot.position : transform.position;
+                Vector3 hitDirection = (other.transform.position - attackerPos).normalized;
+                hitDirection.y = 0; // Yatay darbe yönü
 
-                dummy.TakeDamage(currentDamage, hitPoint, hitDirection);
+                damageable.TakeDamage(currentDamage, hitPoint, hitDirection, ownerRoot);
 
                 if (spawnImpactSparks)
                 {

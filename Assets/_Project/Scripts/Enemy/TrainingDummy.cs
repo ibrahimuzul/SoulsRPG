@@ -2,12 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using SoulsRPG.CameraSystem;
+using SoulsRPG.Combat;
 
 namespace SoulsRPG.Enemy
 {
     [RequireComponent(typeof(LockOnTarget))]
     [RequireComponent(typeof(Collider))]
-    public class TrainingDummy : MonoBehaviour
+    public class TrainingDummy : MonoBehaviour, IDamageable
     {
         [Header("Stats")]
         [SerializeField] private string dummyName = "Antrenman Şövalyesi";
@@ -20,6 +21,8 @@ namespace SoulsRPG.Enemy
 
         private int currentHealth;
         private bool isDead = false;
+
+        public bool IsDead => isDead;
 
         // Renderers & Flash
         private Renderer[] allRenderers;
@@ -91,7 +94,7 @@ namespace SoulsRPG.Enemy
             TakeDamage(damage, transform.position + Vector3.up * 1.2f, defaultDir);
         }
 
-        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection)
+        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null)
         {
             if (isDead) return;
 

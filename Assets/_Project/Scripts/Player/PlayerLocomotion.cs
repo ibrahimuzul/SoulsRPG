@@ -50,6 +50,9 @@ namespace SoulsRPG.Player
         private bool isSprinting;
         private bool isBlocking;
         private bool isAttacking;
+        private bool isStaggered;
+
+        public static PlayerLocomotion Instance { get; private set; }
 
         [Header("Weapon & Damage Settings")]
         [SerializeField] private int attackDamage = 35;
@@ -62,9 +65,11 @@ namespace SoulsRPG.Player
         public bool IsSprinting => isSprinting;
         public bool IsBlocking => isBlocking;
         public bool IsGrounded => isGrounded;
+        public bool IsStaggered => isStaggered;
 
         private void Awake()
         {
+            Instance = this;
             characterController = GetComponent<CharacterController>();
             playerStats = GetComponent<PlayerStats>();
             mainCamera = UnityEngine.Camera.main;
@@ -99,7 +104,7 @@ namespace SoulsRPG.Player
 
         public void HandleMovement(float horizontal, float vertical, bool sprintInput)
         {
-            if (playerStats.isDead || isRolling) return;
+            if (playerStats.isDead || isRolling || isStaggered) return;
 
             CheckGrounded();
 
@@ -121,7 +126,14 @@ namespace SoulsRPG.Player
             }
 
             float currentSpeed = walkSpeed;
-            if (isBlocking) currentSpeed = walkSpeed * 0.7f;
+            if (isBlocking)
+            {
+                currentSpeed = walkSpeed * 0.7f;
+                if (blockStaminaDrainPerSec > 0f)
+                {
+                    playerStats.UseStamina(blockStaminaDrainPerSec * Time.deltaTime);
+                }
+            }
             else if (isSprinting) currentSpeed = sprintSpeed;
             else if (inputVector.magnitude > 0.5f) currentSpeed = runSpeed;
 
@@ -182,7 +194,7 @@ namespace SoulsRPG.Player
 
         public void AttemptDodgeRoll(float horizontal, float vertical)
         {
-            if (playerStats.isDead || isRolling) return;
+            if (playerStats.isDead || isRolling || isStaggered) return;
 
             // Cancel blocking and attack collider when rolling
             SetBlocking(false);
@@ -294,7 +306,7 @@ namespace SoulsRPG.Player
 
         public void AttemptAttack()
         {
-            if (playerStats.isDead || isRolling || isAttacking) return;
+            if (playerStats.isDead || isRolling || isAttacking || isStaggered) return;
 
             if (playerStats.UseStamina(attackStaminaCost))
             {
@@ -374,6 +386,56 @@ namespace SoulsRPG.Player
             {
                 animator.SetBool("isBlocking", isBlocking);
             }
+        }
+
+        public void TriggerBlockRecoil()
+        {
+            if (isRolling || playerStats.isDead) return;
+            StartCoroutine(BlockRecoilRoutine());
+        }
+
+        private IEnumerator BlockRecoilRoutine()
+        {
+            Vector3 recoilDir = -transform.forward;
+            float elapsed = 0f;
+            while (elapsed < 0.12f)
+            {
+                elapsed += Time.deltaTime;
+                if (characterController != null && characterController.enabled)
+                {
+                    characterController.Move(recoilDir * (2.0f * Time.deltaTime));
+                }
+                yield return null;
+            }
+        }
+
+        public void TriggerGuardBreak(float duration = 1.3f)
+        {
+            if (playerStats.isDead || isRolling) return;
+            StartCoroutine(GuardBreakRoutine(duration));
+        }
+
+        private IEnumerator GuardBreakRoutine(float duration)
+        {
+            isStaggered = true;
+            isAttacking = false;
+            SetBlocking(false);
+            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+
+            Vector3 pushBack = -transform.forward;
+            float elapsed = 0f;
+            while (elapsed < 0.25f)
+            {
+                elapsed += Time.deltaTime;
+                if (characterController != null && characterController.enabled)
+                {
+                    characterController.Move(pushBack * (3.5f * Time.deltaTime));
+                }
+                yield return null;
+            }
+
+            yield return new WaitForSeconds(duration - 0.25f);
+            isStaggered = false;
         }
 
         private void CheckGrounded()
