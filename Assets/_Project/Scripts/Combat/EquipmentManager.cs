@@ -65,7 +65,7 @@ namespace SoulsRPG.Combat
                 {
                     col = weaponInstance.AddComponent<WeaponDamageCollider>();
                 }
-                col.SetOwner(transform.root);
+                col.SetOwner(transform);
                 return col;
             }
             return null;
@@ -243,5 +243,18 @@ namespace SoulsRPG.Combat
             }
             return null;
         }
+
+#if UNITY_EDITOR
+        [ContextMenu("⚔️ Topuz Vuruş Alanını Seç ve Düzenle (Select Weapon Hitbox)")]
+        public void SelectWeaponColliderInScene()
+        {
+            var col = GetWeaponCollider();
+            if (col != null)
+            {
+                UnityEditor.Selection.activeGameObject = col.gameObject;
+                UnityEditor.SceneView.lastActiveSceneView?.FrameSelected();
+            }
+        }
+#endif
     }
 }

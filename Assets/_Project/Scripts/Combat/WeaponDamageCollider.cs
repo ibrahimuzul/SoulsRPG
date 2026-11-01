@@ -4,6 +4,7 @@ using SoulsRPG.Enemy;
 
 namespace SoulsRPG.Combat
 {
+    [ExecuteAlways]
     public class WeaponDamageCollider : MonoBehaviour
     {
         [Header("Damage Settings")]
@@ -11,16 +12,46 @@ namespace SoulsRPG.Combat
         [SerializeField] private float poiseDamage = 20f;
         public float PoiseDamage => poiseDamage;
 
-        [Header("Collider Setup")]
+        [Header("Collider Setup (Düzenlenebilir Vuruş Alanı)")]
         [SerializeField] private BoxCollider hitCollider;
         [SerializeField] private Vector3 colliderCenter = new Vector3(0f, 0.45f, 0f);
         [SerializeField] private Vector3 colliderSize = new Vector3(0.35f, 0.90f, 0.35f);
+
+        public Vector3 ColliderCenter => colliderCenter;
+        public Vector3 ColliderSize => colliderSize;
+
+        public void SetColliderBounds(Vector3 center, Vector3 size)
+        {
+            colliderCenter = center;
+            colliderSize = size;
+            ApplyBoundsToCollider();
+        }
+
+        private void OnValidate()
+        {
+            ApplyBoundsToCollider();
+        }
+
+        public void ApplyBoundsToCollider()
+        {
+            if (hitCollider == null)
+            {
+                hitCollider = GetComponent<BoxCollider>();
+            }
+            if (hitCollider != null)
+            {
+                hitCollider.center = colliderCenter;
+                hitCollider.size = colliderSize;
+            }
+        }
 
         [Header("Effects")]
         [SerializeField] private bool spawnImpactSparks = true;
 
         private Transform ownerRoot;
+        private bool isDamageActive = false;
         private readonly List<Collider> alreadyHitColliders = new List<Collider>();
+        private readonly HashSet<IDamageable> alreadyHitDamageables = new HashSet<IDamageable>();
 
         private void Awake()
         {
@@ -68,6 +99,8 @@ namespace SoulsRPG.Combat
         {
             currentDamage = damage;
             alreadyHitColliders.Clear();
+            alreadyHitDamageables.Clear();
+            isDamageActive = true;
             if (hitCollider != null)
             {
                 hitCollider.enabled = true;
@@ -76,22 +109,26 @@ namespace SoulsRPG.Combat
 
         public void DisableDamageCollider()
         {
+            isDamageActive = false;
             if (hitCollider != null)
             {
                 hitCollider.enabled = false;
             }
             alreadyHitColliders.Clear();
+            alreadyHitDamageables.Clear();
         }
 
         private void OnTriggerEnter(Collider other)
         {
+            if (!isDamageActive) return;
+
             // Kendimize veya sahibimize vurmayalım
-            if (ownerRoot != null && (other.transform.root == ownerRoot || other.transform == ownerRoot))
+            if (ownerRoot != null && (other.transform.IsChildOf(ownerRoot) || other.transform == ownerRoot))
             {
                 return;
             }
 
-            // Tek bir savurmada aynı düşmana birden fazla kez vurmayı engelle
+            // Tek bir savurmada aynı collider'a birden fazla kez vurmayı engelle
             if (alreadyHitColliders.Contains(other))
             {
                 return;
@@ -101,19 +138,40 @@ namespace SoulsRPG.Combat
             var damageable = other.GetComponentInParent<IDamageable>();
             if (damageable != null && !damageable.IsDead)
             {
+                // Tek bir savurmada aynı karaktere birden fazla kez vurmayı engelle
+                if (alreadyHitDamageables.Contains(damageable))
+                {
+                    return;
+                }
+                alreadyHitDamageables.Add(damageable);
                 alreadyHitColliders.Add(other);
 
+                Transform attacker = ownerRoot != null ? ownerRoot : transform;
                 Vector3 hitPoint = other.ClosestPoint(transform.position);
-                Vector3 attackerPos = ownerRoot != null ? ownerRoot.position : transform.position;
+                Vector3 attackerPos = attacker.position;
                 Vector3 hitDirection = (other.transform.position - attackerPos).normalized;
                 hitDirection.y = 0; // Yatay darbe yönü
 
-                damageable.TakeDamage(currentDamage, hitPoint, hitDirection, ownerRoot);
+                damageable.TakeDamage(currentDamage, hitPoint, hitDirection, attacker);
+
+                // Temas Noktası Göstergesi (Hem Oyuncuda Hem Düşmanda Görünür)
+                string attackerLabel = attacker.name;
+                CombatDebugVisualizer.SpawnContactPoint(hitPoint, hitDirection, false, $"⚔️ {attackerLabel} TEMASI");
 
                 if (spawnImpactSparks)
                 {
                     SpawnImpactEffect(hitPoint, hitDirection);
                 }
+            }
+        }
+
+        private void Update()
+        {
+            if (isDamageActive)
+            {
+                // Hasar anında (Savurma penceresi) Game ve Scene ekranında parlak kırmızı vuruş kutusu çiz
+                Vector3 worldCenter = transform.TransformPoint(colliderCenter);
+                CombatDebugVisualizer.DrawDebugBox(worldCenter, colliderSize, transform.rotation, Color.red);
             }
         }
 
@@ -148,11 +206,39 @@ namespace SoulsRPG.Combat
             Destroy(sparkObj, 1.0f);
         }
 
-        private void OnDrawGizmosSelected()
+        [ContextMenu("🎯 Preset: Sadece Topuz Başı (Compact)")]
+        public void PresetHeadOnly()
         {
-            Gizmos.color = hitCollider != null && hitCollider.enabled ? Color.red : Color.yellow;
+            SetColliderBounds(new Vector3(0f, 0.65f, 0f), new Vector3(0.35f, 0.45f, 0.35f));
+        }
+
+        [ContextMenu("⚔️ Preset: Dengeli Vuruş Alanı (Balanced)")]
+        public void PresetBalanced()
+        {
+            SetColliderBounds(new Vector3(0f, 0.45f, 0f), new Vector3(0.35f, 0.90f, 0.35f));
+        }
+
+        [ContextMenu("🛡️ Preset: Genişletilmiş / Kolay Temas (Extended)")]
+        public void PresetExtended()
+        {
+            SetColliderBounds(new Vector3(0f, 0.45f, 0f), new Vector3(0.50f, 1.05f, 0.50f));
+        }
+
+        private void OnDrawGizmos()
+        {
             Gizmos.matrix = transform.localToWorldMatrix;
-            Gizmos.DrawWireCube(colliderCenter, colliderSize);
+            if (isDamageActive)
+            {
+                Gizmos.color = new Color(1f, 0.15f, 0.15f, 0.45f);
+                Gizmos.DrawCube(colliderCenter, colliderSize);
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireCube(colliderCenter, colliderSize);
+            }
+            else
+            {
+                Gizmos.color = new Color(0.2f, 1f, 0.4f, 0.4f);
+                Gizmos.DrawWireCube(colliderCenter, colliderSize);
+            }
         }
     }
 }

@@ -236,10 +236,11 @@ namespace SoulsRPG.Player
         private void HandleCombat()
         {
             // SADECE DİJİTAL BUTONLAR:
-            // Kalkan Blok: L1 (Button 4) veya L2 (Button 6) veya Sağ Tık
+            // Kalkan Blok: L1 (Button 4) / L2 (Button 6) / Q / Sağ Tık
             bool isBlocking = Input.GetKey(KeyCode.JoystickButton4) ||
                               Input.GetKey(KeyCode.JoystickButton6) ||
-                              ((Cursor.lockState == CursorLockMode.Locked) && Input.GetMouseButton(1));
+                              Input.GetKey(KeyCode.Q) ||
+                              Input.GetMouseButton(1);
 
             locomotion.SetBlocking(isBlocking);
             statusBlock = isBlocking ? "<color=lime>🛡️ BLOK AKTİF</color>" : "<color=grey>PASİF</color>";
@@ -247,7 +248,7 @@ namespace SoulsRPG.Player
             // Saldırı: R1 (Button 5) / R2 (Button 7) / Sol Tık
             bool r1 = Input.GetKeyDown(KeyCode.JoystickButton5);
             bool r2 = Input.GetKeyDown(KeyCode.JoystickButton7);
-            bool mouseLeft = (Cursor.lockState == CursorLockMode.Locked) && Input.GetMouseButtonDown(0);
+            bool mouseLeft = Input.GetMouseButtonDown(0);
 
             if (r1 || mouseLeft)
             {

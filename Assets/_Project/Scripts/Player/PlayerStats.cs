@@ -13,9 +13,9 @@ namespace SoulsRPG.Player
         private int currentHealth;
 
         [Header("Stamina Settings")]
-        [SerializeField] private float maxStamina = 100f;
-        [SerializeField] private float staminaRegenRate = 35f;
-        [SerializeField] private float staminaRegenDelay = 1.0f; // Dark souls delay before regen starts
+        [SerializeField] private float maxStamina = 120f;
+        [SerializeField] private float staminaRegenRate = 60f;
+        [SerializeField] private float staminaRegenDelay = 0.35f; // Hızlı ve dinamik test için gecikme azaltıldı
         private float currentStamina;
         private float regenTimer = 0f;
 
@@ -64,7 +64,14 @@ namespace SoulsRPG.Player
 
             if (currentStamina < maxStamina)
             {
-                currentStamina += staminaRegenRate * Time.deltaTime;
+                // Kalkan yukarıdayken stamina %50 hızında dolmaya devam eder (asla tamamen durmaz)
+                float rate = staminaRegenRate;
+                if (PlayerLocomotion.Instance != null && PlayerLocomotion.Instance.IsBlocking)
+                {
+                    rate *= 0.5f;
+                }
+
+                currentStamina += rate * Time.deltaTime;
                 if (currentStamina > maxStamina)
                 {
                     currentStamina = maxStamina;
@@ -77,9 +84,9 @@ namespace SoulsRPG.Player
         {
             if (currentStamina < amount)
             {
-                // Even with low stamina, Dark Souls allows a roll/attack at cost of going into negative stamina
+                // Stamina bittiğinde bile hafifçe eksiye düşmeden 0'a çekilir ve hemen toparlanmaya başlar
                 currentStamina = 0f;
-                regenTimer = staminaRegenDelay * 1.5f; // Extra penalty for stamina exhaustion
+                regenTimer = staminaRegenDelay;
                 OnStaminaChanged?.Invoke(currentStamina, maxStamina);
                 return true;
             }
@@ -106,12 +113,28 @@ namespace SoulsRPG.Player
             var locomotion = PlayerLocomotion.Instance;
             if (locomotion != null && locomotion.IsBlocking)
             {
-                // Gelen saldırı ön cepheden mi (Dot product check)
-                float dot = Vector3.Dot(transform.forward, -hitDirection);
-                if (dot > 0.25f)
+                // Saldırganın yönünü net olarak belirle
+                Vector3 toAttacker = Vector3.zero;
+                if (attacker != null)
                 {
-                    // Blok Başarılı! Hasar staminadan düşülür
-                    float staminaCost = damage * 0.75f;
+                    toAttacker = attacker.position - transform.position;
+                }
+                else if (hitPoint != Vector3.zero)
+                {
+                    toAttacker = hitPoint - transform.position;
+                }
+                else
+                {
+                    toAttacker = -hitDirection;
+                }
+                toAttacker.y = 0;
+
+                // Gelen saldırı ön cepheden mi (Geniş 200° blok açısı: dot > -0.15f)
+                float dot = Vector3.Dot(transform.forward, toAttacker.normalized);
+                if (dot > -0.15f)
+                {
+                    // BLOK BAŞARILI! Kesinlikle can hasarı almaz (0 Can Hasarı)
+                    float staminaCost = Mathf.Max(6f, damage * 0.35f);
                     bool hadStamina = currentStamina >= staminaCost;
                     UseStamina(staminaCost);
 
@@ -126,8 +149,9 @@ namespace SoulsRPG.Player
                         locomotion.TriggerBlockRecoil();
                     }
 
-                    SpawnBlockEffect(hitPoint, -hitDirection);
-                    return;
+                    SpawnBlockEffect(hitPoint, toAttacker.normalized);
+                    CombatDebugVisualizer.SpawnContactPoint(hitPoint, toAttacker.normalized, true, "🛡️ OYUNCU KALKAN TEMASI");
+                    return; // Can hasarını kesinlikle engeller!
                 }
             }
 

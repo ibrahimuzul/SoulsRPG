@@ -291,6 +291,18 @@ namespace SoulsRPG.Enemy
             // Rengi geri yükle
             GUI.color = Color.white;
         }
+
+        private void OnDrawGizmos()
+        {
+            var cap = GetComponent<CapsuleCollider>();
+            if (cap != null)
+            {
+                Gizmos.matrix = transform.localToWorldMatrix;
+                Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.6f);
+                Vector3 size = new Vector3(cap.radius * 2f, cap.height, cap.radius * 2f);
+                Gizmos.DrawWireCube(cap.center, size);
+            }
+        }
     }
 
     /// <summary>

@@ -12,24 +12,23 @@ namespace SoulsRPG.Player
         [SerializeField] private float walkSpeed = 3.0f;
         [SerializeField] private float runSpeed = 5.5f;
         [SerializeField] private float sprintSpeed = 8.5f;
-        [SerializeField] private float sprintStaminaCostPerSec = 15f;
+        [SerializeField] private float sprintStaminaCostPerSec = 8f;
         [SerializeField] private float rotationSpeed = 12f;
 
         [Header("Dodge Roll Settings")]
-        [SerializeField] private float rollStaminaCost = 22f;
+        [SerializeField] private float rollStaminaCost = 14f;
         [SerializeField] private float rollDuration = 0.85f;
         [SerializeField] private float rollSpeed = 9.5f;
         [SerializeField] private float iFrameStart = 0.1f;
         [SerializeField] private float iFrameDuration = 0.45f;
 
         [Header("Backstep Settings")]
-        [SerializeField] private float backstepStaminaCost = 15f;
+        [SerializeField] private float backstepStaminaCost = 10f;
         [SerializeField] private float backstepDuration = 0.5f;
         [SerializeField] private float backstepSpeed = 6.0f;
 
         [Header("Combat Actions")]
-        [SerializeField] private float attackStaminaCost = 18f;
-        [SerializeField] private float blockStaminaDrainPerSec = 5f;
+        [SerializeField] private float attackStaminaCost = 12f;
 
         [Header("Gravity & Grounding")]
         [SerializeField] private float gravity = -20f;
@@ -129,10 +128,6 @@ namespace SoulsRPG.Player
             if (isBlocking)
             {
                 currentSpeed = walkSpeed * 0.7f;
-                if (blockStaminaDrainPerSec > 0f)
-                {
-                    playerStats.UseStamina(blockStaminaDrainPerSec * Time.deltaTime);
-                }
             }
             else if (isSprinting) currentSpeed = sprintSpeed;
             else if (inputVector.magnitude > 0.5f) currentSpeed = runSpeed;
@@ -374,7 +369,7 @@ namespace SoulsRPG.Player
 
         public void SetBlocking(bool blocking)
         {
-            if (playerStats.isDead || isRolling)
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking)
             {
                 isBlocking = false;
                 if (animator != null) animator.SetBool("isBlocking", false);
@@ -442,5 +437,29 @@ namespace SoulsRPG.Player
         {
             isGrounded = characterController.isGrounded;
         }
+
+        private void OnDrawGizmos()
+        {
+            if (characterController == null) characterController = GetComponent<CharacterController>();
+            if (characterController != null)
+            {
+                Gizmos.matrix = transform.localToWorldMatrix;
+                Gizmos.color = isBlocking ? Color.cyan : new Color(0.2f, 0.6f, 1.0f, 0.65f);
+                Vector3 size = new Vector3(characterController.radius * 2f, characterController.height, characterController.radius * 2f);
+                Gizmos.DrawWireCube(characterController.center, size);
+            }
+        }
+
+#if UNITY_EDITOR
+        [ContextMenu("⚔️ Topuz Vuruş Alanını Seç ve Düzenle (Select Weapon Hitbox)")]
+        public void SelectWeaponColliderInScene()
+        {
+            var eq = GetComponent<Combat.EquipmentManager>();
+            if (eq != null)
+            {
+                eq.SelectWeaponColliderInScene();
+            }
+        }
+#endif
     }
 }

@@ -2575,9 +2575,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.Player.PlayerStats
   maxHealth: 100
-  maxStamina: 100
-  staminaRegenRate: 35
-  staminaRegenDelay: 1
+  maxStamina: 120
+  staminaRegenRate: 60
+  staminaRegenDelay: 0.35
   maxPoise: 50
   isInvulnerable: 0
   isDead: 0
@@ -2631,18 +2631,17 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 5.5
   sprintSpeed: 8.5
-  sprintStaminaCostPerSec: 15
+  sprintStaminaCostPerSec: 8
   rotationSpeed: 12
-  rollStaminaCost: 22
+  rollStaminaCost: 14
   rollDuration: 0.75
   rollSpeed: 9.5
   iFrameStart: 0.1
   iFrameDuration: 0.35
-  backstepStaminaCost: 15
+  backstepStaminaCost: 10
   backstepDuration: 0.5
   backstepSpeed: 6
-  attackStaminaCost: 18
-  blockStaminaDrainPerSec: 5
+  attackStaminaCost: 12
   gravity: -20
   groundLayers:
     serializedVersion: 2

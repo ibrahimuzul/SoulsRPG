@@ -194,7 +194,7 @@ namespace SoulsRPG.Enemy
             }
             if (weaponCollider != null)
             {
-                weaponCollider.SetOwner(transform.root);
+                weaponCollider.SetOwner(transform);
             }
 
             FindPlayerTarget();
@@ -595,11 +595,18 @@ namespace SoulsRPG.Enemy
             // Shield Block Check (Eğer düşman kalkan tutuyorsa ve darbe önden geliyorsa)
             if (isBlocking)
             {
-                float dot = Vector3.Dot(transform.forward, -hitDirection);
-                if (dot > 0.25f)
+                Vector3 toAttacker = Vector3.zero;
+                if (attacker != null) toAttacker = attacker.position - transform.position;
+                else if (hitPoint != Vector3.zero) toAttacker = hitPoint - transform.position;
+                else toAttacker = -hitDirection;
+                toAttacker.y = 0;
+
+                float dot = Vector3.Dot(transform.forward, toAttacker.normalized);
+                if (dot > -0.15f)
                 {
                     // Düşman kalkanıyla darbeyi engelledi!
-                    SpawnBlockSparks(hitPoint, -hitDirection);
+                    SpawnBlockSparks(hitPoint, toAttacker.normalized);
+                    CombatDebugVisualizer.SpawnContactPoint(hitPoint, toAttacker.normalized, true, "🛡️ DÜŞMAN KALKAN TEMASI");
                     return;
                 }
             }
@@ -830,6 +837,18 @@ namespace SoulsRPG.Enemy
             GUI.color = Color.white;
         }
 
+        private void OnDrawGizmos()
+        {
+            if (characterController == null) characterController = GetComponent<CharacterController>();
+            if (characterController != null)
+            {
+                Gizmos.matrix = transform.localToWorldMatrix;
+                Gizmos.color = isBlocking ? Color.cyan : new Color(1.0f, 0.45f, 0.15f, 0.65f);
+                Vector3 size = new Vector3(characterController.radius * 2f, characterController.height, characterController.radius * 2f);
+                Gizmos.DrawWireCube(characterController.center, size);
+            }
+        }
+
         private void OnDrawGizmosSelected()
         {
             // Görme alanı (Sarı)
@@ -851,5 +870,17 @@ namespace SoulsRPG.Enemy
             Gizmos.DrawRay(transform.position + Vector3.up, leftRay * sightRange);
             Gizmos.DrawRay(transform.position + Vector3.up, rightRay * sightRange);
         }
+
+#if UNITY_EDITOR
+        [ContextMenu("⚔️ Topuz Vuruş Alanını Seç ve Düzenle (Select Weapon Hitbox)")]
+        public void SelectWeaponColliderInScene()
+        {
+            var eq = GetComponent<EquipmentManager>();
+            if (eq != null)
+            {
+                eq.SelectWeaponColliderInScene();
+            }
+        }
+#endif
     }
 }
