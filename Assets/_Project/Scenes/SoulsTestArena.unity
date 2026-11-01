@@ -2642,6 +2642,7 @@ MonoBehaviour:
   backstepDuration: 0.5
   backstepSpeed: 6
   attackStaminaCost: 12
+  blockVisualOffsetAngle: 30
   gravity: -20
   groundLayers:
     serializedVersion: 2

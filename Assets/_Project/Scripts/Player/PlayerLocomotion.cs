@@ -30,6 +30,14 @@ namespace SoulsRPG.Player
         [Header("Combat Actions")]
         [SerializeField] private float attackStaminaCost = 12f;
 
+        [Header("Mesh & Locomotion Stabilization")]
+        [Tooltip("Animasyon kaynaklı root-motion kaymalarını engelleyerek karakter modelini daima CharacterController merkezinde tutar")]
+        [SerializeField] private bool stabilizeLocomotionMesh = true;
+
+        [Header("Block Stance Tuning")]
+        [Tooltip("Blok animasyonunda gövde sola açılı durduğu için, kalkanı hedefe tam hizalamak üzere görsel modeli sağa çevirme açısı")]
+        [SerializeField] private float blockVisualOffsetAngle = 30f;
+
         [Header("Gravity & Grounding")]
         [SerializeField] private float gravity = -20f;
         [SerializeField] private LayerMask groundLayers;
@@ -83,6 +91,11 @@ namespace SoulsRPG.Player
             eq.FindSocketsIfMissing();
         }
 
+        private Transform animatorTransform;
+        private Transform pelvisTransform;
+        private Vector3 initialPelvisRelativePos;
+        private bool hasPelvisReference;
+
         private void Start()
         {
             var eq = GetComponent<Combat.EquipmentManager>();
@@ -94,11 +107,70 @@ namespace SoulsRPG.Player
             {
                 weaponCollider = GetComponentInChildren<Combat.WeaponDamageCollider>();
             }
+
+            InitializeMeshStabilization();
         }
 
         public void SetAnimator(Animator anim)
         {
             animator = anim;
+            InitializeMeshStabilization();
+        }
+
+        private void InitializeMeshStabilization()
+        {
+            if (animator == null)
+            {
+                animator = GetComponentInChildren<Animator>();
+            }
+
+            if (animator != null)
+            {
+                animatorTransform = animator.transform;
+                pelvisTransform = animator.GetBoneTransform(HumanBodyBones.Hips);
+                if (pelvisTransform == null)
+                {
+                    pelvisTransform = animator.transform.Find("root/pelvis") ??
+                                     animator.transform.Find("pelvis") ??
+                                     animator.transform.Find("root");
+                }
+
+                if (pelvisTransform != null)
+                {
+                    initialPelvisRelativePos = transform.InverseTransformPoint(pelvisTransform.position);
+                    hasPelvisReference = true;
+                }
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (!stabilizeLocomotionMesh) return;
+
+            if (!hasPelvisReference && animator != null)
+            {
+                InitializeMeshStabilization();
+            }
+
+            // 1. Animator child objesini daima Player merkezinde (0,0,0) tut ve blok anında kalkanı hedefe hizala
+            if (animatorTransform != null && animatorTransform != transform)
+            {
+                animatorTransform.localPosition = Vector3.zero;
+
+                float targetAngle = isBlocking ? blockVisualOffsetAngle : 0f;
+                Quaternion targetRot = Quaternion.Euler(0f, targetAngle, 0f);
+                animatorTransform.localRotation = Quaternion.Slerp(animatorTransform.localRotation, targetRot, 15f * Time.deltaTime);
+            }
+
+            // 2. Animasyonun Hips kemiğini ileri veya yana kaydırmasını (root motion drift) önle
+            // Horizontal (X ve Z) kapsüle kilitlenir; dikey (Y) adım/sekme animasyonu serbest kalır!
+            if (hasPelvisReference && pelvisTransform != null)
+            {
+                Vector3 relPos = transform.InverseTransformPoint(pelvisTransform.position);
+                relPos.x = initialPelvisRelativePos.x;
+                relPos.z = initialPelvisRelativePos.z;
+                pelvisTransform.position = transform.TransformPoint(relPos);
+            }
         }
 
         public void HandleMovement(float horizontal, float vertical, bool sprintInput)
@@ -167,7 +239,7 @@ namespace SoulsRPG.Player
         {
             if (CameraManager.Instance != null && CameraManager.Instance.IsLockedOn)
             {
-                // Locked-on: Always face the locked enemy
+                // Locked-on: Rakibe tam cepheden odaklan
                 Vector3 targetDir = CameraManager.Instance.CurrentLockedTarget.transform.position - transform.position;
                 targetDir.y = 0;
                 if (targetDir != Vector3.zero)
@@ -178,9 +250,21 @@ namespace SoulsRPG.Player
             }
             else
             {
-                // Free-look: Face direction of movement
-                if (inputVector != Vector3.zero)
+                // Free-look:
+                if (isBlocking)
                 {
+                    // Serbest bakışta blok yapılırken kameranın baktığı yöne tam cepheden dön
+                    Vector3 camFwd = mainCamera != null ? mainCamera.transform.forward : transform.forward;
+                    camFwd.y = 0;
+                    if (camFwd != Vector3.zero)
+                    {
+                        Quaternion targetRot = Quaternion.LookRotation(camFwd);
+                        transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
+                    }
+                }
+                else if (inputVector != Vector3.zero)
+                {
+                    // Normal serbest hareket: Hareket yönüne dön
                     Quaternion targetRot = Quaternion.LookRotation(inputVector);
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
                 }

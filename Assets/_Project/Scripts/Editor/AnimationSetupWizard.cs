@@ -20,14 +20,13 @@ namespace SoulsRPG.EditorTools
             // 1. Convert Knight FBX to Humanoid
             SetupModelAsHumanoid(KnightModelPath);
 
-            // 2. Setup Animation FBX files
-            SetupAnimationFBX("X Bot@Sword And Shield Idle.fbx", true, "Idle", true);
-            SetupAnimationFBX("X Bot@Sword And Shield Walk.fbx", true, "Walk", true);
-            SetupAnimationFBX("X Bot@Sword And Shield Run.fbx", true, "Run", true);
-            // ROLL: lockRootPositionXZ = FALSE so forward movement is extracted from hips (NO SNAP-BACK / NO SLIDING BACK!)
+            // 2. Setup Animation FBX files (lockRootPositionXZ = FALSE -> in-place, no drift/snap-back!)
+            SetupAnimationFBX("X Bot@Sword And Shield Idle.fbx", true, "Idle", false);
+            SetupAnimationFBX("X Bot@Sword And Shield Walk.fbx", true, "Walk", false);
+            SetupAnimationFBX("X Bot@Sword And Shield Run.fbx", true, "Run", false);
             SetupAnimationFBX("X Bot@Standing Dive Forward.fbx", false, "Roll", false);
             SetupAnimationFBX("X Bot@Sword And Shield Slash.fbx", false, "Attack", false);
-            SetupAnimationFBX("X Bot@Sword And Shield Block Idle.fbx", true, "Block", true);
+            SetupAnimationFBX("X Bot@Sword And Shield Block Idle.fbx", true, "Block", false);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -132,8 +131,23 @@ namespace SoulsRPG.EditorTools
             AssignToScenePlayer(controller);
 
             EditorUtility.DisplayDialog("Animasyon Kurulumu Tamamlandı!",
-                "Animasyonlar ve takla (roll) düzeltmesi başarıyla uygulandı!\n\n" +
-                "Takla anında karakter artık merkezden kaymayacak ve geriye zıplamayacak.", "Tamam");
+                "Animasyonlar ve takla/yürüme düzeltmesi başarıyla uygulandı!\n\n" +
+                "Karakter artık yürürken veya koşarken merkezden kaymayacak ve geriye ışınlanmayacak.", "Tamam");
+        }
+
+        [MenuItem("SoulsRPG/Düzelt: Karakter Yürüme ve Koşma Kaymasını Düzelt (Fix Locomotion Drift)", false, 3)]
+        public static void FixLocomotionDrift()
+        {
+            Debug.Log("<color=green><b>[AnimationSetup] Yürüme ve Koşma Animasyon Kayması Düzeltiliyor...</b></color>");
+            SetupAnimationFBX("X Bot@Sword And Shield Walk.fbx", true, "Walk", false);
+            SetupAnimationFBX("X Bot@Sword And Shield Run.fbx", true, "Run", false);
+            SetupAnimationFBX("X Bot@Sword And Shield Idle.fbx", true, "Idle", false);
+            SetupAnimationFBX("X Bot@Standing Dive Forward.fbx", false, "Roll", false);
+            SetupAnimationFBX("X Bot@Sword And Shield Slash.fbx", false, "Attack", false);
+            SetupAnimationFBX("X Bot@Sword And Shield Block Idle.fbx", true, "Block", false);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("Tamamlandı", "Yürüme ve koşma animasyonlarının merkezden kayma ve geriye ışınlanma sorunu düzeltildi!\n\nAnimasyonlar artık karakter kapsülü merkezinde sabit oynatılacak.", "Tamam");
         }
 
         private static void SetupModelAsHumanoid(string path)

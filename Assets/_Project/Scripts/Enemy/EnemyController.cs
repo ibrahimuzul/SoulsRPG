@@ -111,14 +111,15 @@ namespace SoulsRPG.Enemy
             spawnPosition = transform.position;
             spawnRotation = transform.rotation;
 
+            var cap = GetComponent<CapsuleCollider>();
+            if (cap != null) cap.enabled = false;
+
             characterController = GetComponent<CharacterController>();
             if (characterController == null)
             {
-                var cap = GetComponent<CapsuleCollider>();
                 Vector3 c = cap != null ? cap.center : new Vector3(0, 1, 0);
                 float r = cap != null ? cap.radius : 0.45f;
                 float h = cap != null ? cap.height : 2.0f;
-                if (cap != null) cap.enabled = false;
 
                 characterController = gameObject.AddComponent<CharacterController>();
                 characterController.center = c;
