@@ -53,6 +53,22 @@ namespace SoulsRPG.Combat
         {
             FindSocketsIfMissing();
             UpdateTransforms();
+            GetWeaponCollider();
+        }
+
+        public WeaponDamageCollider GetWeaponCollider()
+        {
+            if (weaponInstance != null)
+            {
+                var col = weaponInstance.GetComponent<WeaponDamageCollider>();
+                if (col == null)
+                {
+                    col = weaponInstance.AddComponent<WeaponDamageCollider>();
+                }
+                col.SetOwner(transform.root);
+                return col;
+            }
+            return null;
         }
 
         private void LateUpdate()

@@ -51,6 +51,13 @@ namespace SoulsRPG.Player
         private bool isBlocking;
         private bool isAttacking;
 
+        [Header("Weapon & Damage Settings")]
+        [SerializeField] private int attackDamage = 35;
+        [SerializeField] private float attackWindupTime = 0.20f;
+        [SerializeField] private float attackActiveTime = 0.32f;
+        [SerializeField] private float attackRecoveryTime = 0.33f;
+        private Combat.WeaponDamageCollider weaponCollider;
+
         public bool IsRolling => isRolling;
         public bool IsSprinting => isSprinting;
         public bool IsBlocking => isBlocking;
@@ -70,6 +77,19 @@ namespace SoulsRPG.Player
                 eq = gameObject.AddComponent<Combat.EquipmentManager>();
             }
             eq.FindSocketsIfMissing();
+        }
+
+        private void Start()
+        {
+            var eq = GetComponent<Combat.EquipmentManager>();
+            if (eq != null)
+            {
+                weaponCollider = eq.GetWeaponCollider();
+            }
+            if (weaponCollider == null)
+            {
+                weaponCollider = GetComponentInChildren<Combat.WeaponDamageCollider>();
+            }
         }
 
         public void SetAnimator(Animator anim)
@@ -164,8 +184,10 @@ namespace SoulsRPG.Player
         {
             if (playerStats.isDead || isRolling) return;
 
-            // Cancel blocking when rolling
+            // Cancel blocking and attack collider when rolling
             SetBlocking(false);
+            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            isAttacking = false;
 
             Vector3 camForward = mainCamera.transform.forward;
             Vector3 camRight = mainCamera.transform.right;
@@ -284,12 +306,57 @@ namespace SoulsRPG.Player
         {
             isAttacking = true;
 
+            // Ensure weapon collider reference is ready
+            if (weaponCollider == null)
+            {
+                var eq = GetComponent<Combat.EquipmentManager>();
+                if (eq != null) weaponCollider = eq.GetWeaponCollider();
+                if (weaponCollider == null) weaponCollider = GetComponentInChildren<Combat.WeaponDamageCollider>();
+            }
+
+            Vector3 attackStepDir = transform.forward;
+
             if (animator != null)
             {
                 animator.SetTrigger("isAttacking");
             }
 
-            yield return new WaitForSeconds(0.75f);
+            // 1. Wind-up Delay (Silah geriye çekiliyor)
+            float elapsed = 0f;
+            while (elapsed < attackWindupTime)
+            {
+                elapsed += Time.deltaTime;
+                if (characterController != null && characterController.enabled)
+                {
+                    characterController.Move(attackStepDir * (1.5f * Time.deltaTime));
+                }
+                yield return null;
+            }
+
+            // 2. Active Damage Window (Topuz savruluyor, hasar alanı AKTİF!)
+            if (weaponCollider != null)
+            {
+                weaponCollider.EnableDamageCollider(attackDamage);
+            }
+
+            elapsed = 0f;
+            while (elapsed < attackActiveTime)
+            {
+                elapsed += Time.deltaTime;
+                if (characterController != null && characterController.enabled)
+                {
+                    characterController.Move(attackStepDir * (1.0f * Time.deltaTime));
+                }
+                yield return null;
+            }
+
+            // 3. Recovery (Savurma bitti, hasar alanı KAPALI!)
+            if (weaponCollider != null)
+            {
+                weaponCollider.DisableDamageCollider();
+            }
+
+            yield return new WaitForSeconds(attackRecoveryTime);
             isAttacking = false;
         }
 
