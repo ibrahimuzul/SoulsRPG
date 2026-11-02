@@ -748,6 +748,10 @@ namespace SoulsRPG.Enemy
             if (characterController != null) characterController.enabled = false;
             if (navAgent != null) navAgent.enabled = false;
 
+            if (PlayerStats.Instance != null)
+            {
+                PlayerStats.Instance.AddSouls(soulsReward);
+            }
             Debug.Log($"<color=yellow>{enemyName} yenildi! +{soulsReward} Ruh kazanıldı.</color>");
 
             StartCoroutine(DeathAndRespawnRoutine());

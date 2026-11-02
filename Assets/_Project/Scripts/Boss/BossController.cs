@@ -697,6 +697,11 @@ namespace SoulsRPG.Boss
             SetAnimationSpeed(0f);
 
             // Zafer Afişi ve Ruh Ödülü
+            if (PlayerStats.Instance != null)
+            {
+                PlayerStats.Instance.AddSouls(soulsReward);
+            }
+
             if (BossHealthBarHUD.Instance != null)
             {
                 BossHealthBarHUD.Instance.OnBossDefeated(soulsReward);

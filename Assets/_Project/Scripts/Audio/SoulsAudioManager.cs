@@ -35,6 +35,10 @@ namespace SoulsRPG.Audio
         [SerializeField] private AudioClip bossSlamClip;
         [SerializeField] private AudioClip bossOverheadClip;
 
+        [Header("Bonfire Audio Clips (Ateş ve Seviye Sesleri)")]
+        [SerializeField] private AudioClip bonfireRestClip;
+        [SerializeField] private AudioClip bonfireLevelUpClip;
+
         // 3D Spatial Audio için AudioSource Havuzu (Pool)
         private readonly List<AudioSource> audioSourcePool = new List<AudioSource>();
         private const int PoolInitialSize = 10;
@@ -139,6 +143,28 @@ namespace SoulsRPG.Audio
             src.Play();
         }
 
+        public void PlayBonfireRest(Vector3 position)
+        {
+            if (bonfireRestClip == null) return;
+            var src = GetAvailableSource();
+            src.transform.position = position;
+            src.clip = bonfireRestClip;
+            src.volume = masterVolume * 0.95f;
+            src.pitch = 1.0f;
+            src.Play();
+        }
+
+        public void PlayBonfireLevelUp(Vector3 position)
+        {
+            if (bonfireLevelUpClip == null) return;
+            var src = GetAvailableSource();
+            src.transform.position = position;
+            src.clip = bonfireLevelUpClip;
+            src.volume = masterVolume * 1.0f;
+            src.pitch = 1.0f;
+            src.Play();
+        }
+
         private void PlayRandomClip(AudioClip[] clips, Vector3 position, float volume, float minPitch, float maxPitch)
         {
             if (clips == null || clips.Length == 0) return;
@@ -187,6 +213,14 @@ namespace SoulsRPG.Audio
             if (bossOverheadClip == null)
             {
                 bossOverheadClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/BOSS_Overhead_Smash.wav");
+            }
+            if (bonfireRestClip == null)
+            {
+                bonfireRestClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/BONFIRE_Rest.wav");
+            }
+            if (bonfireLevelUpClip == null)
+            {
+                bonfireLevelUpClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/BONFIRE_LevelUp.wav");
             }
 #endif
         }

@@ -196,6 +196,11 @@ namespace SoulsRPG.Enemy
         {
             isDead = true;
 
+            if (Player.PlayerStats.Instance != null)
+            {
+                Player.PlayerStats.Instance.AddSouls(100);
+            }
+
             if (lockOnTarget != null)
             {
                 lockOnTarget.SetLockable(false);

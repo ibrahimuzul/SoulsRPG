@@ -69,6 +69,8 @@ namespace SoulsRPG.Player
 
         private void Update()
         {
+            if (locomotion != null && locomotion.IsResting) return;
+
             // F1 ile bilgi panelini gizle / aç
             if (Input.GetKeyDown(KeyCode.F1))
             {
@@ -106,6 +108,7 @@ namespace SoulsRPG.Player
             ReadAllAxes();
 
             if (stats != null && stats.isDead) return;
+            if (locomotion != null && locomotion.IsResting) return;
 
             if (cameraManager == null)
             {

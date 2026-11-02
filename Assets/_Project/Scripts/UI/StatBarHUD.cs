@@ -11,10 +11,13 @@ namespace SoulsRPG.UI
 
         [Header("Health Bar UI")]
         [SerializeField] private Slider healthSlider;
-        [SerializeField] private Slider healthEaseSlider; // The delayed yellow bar when taking damage
+        [SerializeField] private Slider healthEaseSlider;
 
         [Header("Stamina Bar UI")]
         [SerializeField] private Slider staminaSlider;
+
+        [Header("Souls Counter UI")]
+        [SerializeField] private Text soulsCounterText;
 
         private void Start()
         {
@@ -23,13 +26,17 @@ namespace SoulsRPG.UI
                 playerStats = PlayerStats.Instance != null ? PlayerStats.Instance : FindAnyObjectByType<PlayerStats>();
             }
 
+            EnsureSoulsCounterCreated();
+
             if (playerStats != null)
             {
                 playerStats.OnHealthChanged += UpdateHealthBar;
                 playerStats.OnStaminaChanged += UpdateStaminaBar;
+                playerStats.OnSoulsChanged += UpdateSoulsDisplay;
 
                 UpdateHealthBar(playerStats.CurrentHealth, playerStats.MaxHealth);
                 UpdateStaminaBar(playerStats.CurrentStamina, playerStats.MaxStamina);
+                UpdateSoulsDisplay(playerStats.CurrentSouls);
             }
         }
 
@@ -39,6 +46,7 @@ namespace SoulsRPG.UI
             {
                 playerStats.OnHealthChanged -= UpdateHealthBar;
                 playerStats.OnStaminaChanged -= UpdateStaminaBar;
+                playerStats.OnSoulsChanged -= UpdateSoulsDisplay;
             }
         }
 
@@ -70,6 +78,59 @@ namespace SoulsRPG.UI
                 staminaSlider.maxValue = max;
                 staminaSlider.value = current;
             }
+        }
+
+        private void UpdateSoulsDisplay(int currentSouls)
+        {
+            if (soulsCounterText != null)
+            {
+                soulsCounterText.text = $"✦  {currentSouls:N0}";
+            }
+        }
+
+        private void EnsureSoulsCounterCreated()
+        {
+            if (soulsCounterText != null) return;
+
+            Canvas canvas = GetComponentInParent<Canvas>() ?? FindAnyObjectByType<Canvas>();
+            if (canvas == null) return;
+
+            var existing = canvas.transform.Find("SoulsCounter_Container");
+            if (existing != null)
+            {
+                soulsCounterText = existing.GetComponentInChildren<Text>();
+                return;
+            }
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            var container = new GameObject("SoulsCounter_Container");
+            container.transform.SetParent(canvas.transform, false);
+
+            var rect = container.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(1f, 0f);
+            rect.anchoredPosition = new Vector2(-28f, 26f);
+            rect.sizeDelta = new Vector2(180f, 38f);
+
+            var bg = container.AddComponent<Image>();
+            bg.color = new Color(0.06f, 0.06f, 0.08f, 0.85f);
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(container.transform, false);
+            var tRect = textGo.AddComponent<RectTransform>();
+            tRect.anchorMin = Vector2.zero;
+            tRect.anchorMax = Vector2.one;
+            tRect.sizeDelta = Vector2.zero;
+
+            soulsCounterText = textGo.AddComponent<Text>();
+            soulsCounterText.font = font;
+            soulsCounterText.fontSize = 16;
+            soulsCounterText.fontStyle = FontStyle.Bold;
+            soulsCounterText.alignment = TextAnchor.MiddleCenter;
+            soulsCounterText.color = new Color(0.95f, 0.88f, 0.55f); // Dark Souls Gold
+            soulsCounterText.text = "✦  0";
         }
     }
 }

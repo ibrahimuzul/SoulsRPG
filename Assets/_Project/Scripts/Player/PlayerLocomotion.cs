@@ -77,6 +77,8 @@ namespace SoulsRPG.Player
         public bool IsBlocking => isBlocking;
         public bool IsGrounded => isGrounded;
         public bool IsStaggered => isStaggered;
+        public bool isResting = false;
+        public bool IsResting => isResting;
 
         private void Awake()
         {
@@ -179,7 +181,7 @@ namespace SoulsRPG.Player
 
         public void HandleMovement(float horizontal, float vertical, bool sprintInput)
         {
-            if (playerStats.isDead || isRolling || isStaggered) return;
+            if (playerStats.isDead || isRolling || isStaggered || isResting) return;
 
             CheckGrounded();
 
@@ -495,6 +497,25 @@ namespace SoulsRPG.Player
             {
                 animator.SetBool("isBlocking", isBlocking);
             }
+        }
+
+        public void SetResting(bool resting)
+        {
+            isResting = resting;
+            if (resting)
+            {
+                isSprinting = false;
+                SetBlocking(false);
+                if (animator != null)
+                {
+                    animator.SetFloat("Speed", 0f);
+                }
+            }
+        }
+
+        public void UpdateAttackDamage(int newDamage)
+        {
+            attackDamage = newDamage;
         }
 
         public void TriggerBlockRecoil()

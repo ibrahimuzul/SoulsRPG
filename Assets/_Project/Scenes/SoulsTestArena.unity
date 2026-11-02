@@ -617,6 +617,55 @@ Transform:
   - {fileID: 2039516992}
   m_Father: {fileID: 1965209444}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &212606185
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 212606187}
+  - component: {fileID: 212606186}
+  m_Layer: 0
+  m_Name: Bonfire_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &212606186
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 212606185}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 404811814a0e4b046afe9582afe46014, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.Environment.Bonfire
+  bonfireName: "Kale Avlusu Ate\u015Fi"
+  interactionRadius: 2.8
+  fireColor: {r: 1, g: 0.55, b: 0.15, a: 1}
+  fireLight: {fileID: 0}
+  fireParticles: {fileID: 0}
+--- !u!4 &212606187
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 212606185}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.09, z: -10}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &259563729
 GameObject:
   m_ObjectHideFlags: 0
@@ -1102,6 +1151,74 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6140076676781507759, guid: d56a61b7b0540114392a813f8f54b499, type: 3}
   m_PrefabInstance: {fileID: 394606877}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &403207375
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 403207378}
+  - component: {fileID: 403207377}
+  - component: {fileID: 403207376}
+  m_Layer: 0
+  m_Name: --- EVENT SYSTEM ---
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &403207376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403207375}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.StandaloneInputModule
+  m_SendPointerHoverToParent: 1
+  m_HorizontalAxis: Horizontal
+  m_VerticalAxis: Vertical
+  m_SubmitButton: Submit
+  m_CancelButton: Cancel
+  m_InputActionsPerSecond: 10
+  m_RepeatDelay: 0.5
+  m_ForceModuleActive: 0
+--- !u!114 &403207377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403207375}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76c392e42b5098c458856cdf6ecaaaa1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.EventSystem
+  m_FirstSelected: {fileID: 0}
+  m_sendNavigationEvents: 1
+  m_DragThreshold: 10
+--- !u!4 &403207378
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 403207375}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &435272203
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2017,7 +2134,7 @@ MonoBehaviour:
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 42
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -2988,6 +3105,8 @@ MonoBehaviour:
   bossRoarClip: {fileID: 8300000, guid: a891ab19e930e314f89cb32693a8798e, type: 3}
   bossSlamClip: {fileID: 8300000, guid: 46b8dbdb10e83b74d9f09234bd9ee88d, type: 3}
   bossOverheadClip: {fileID: 8300000, guid: 3af44c950d78d8b4b9b183ae530fcd78, type: 3}
+  bonfireRestClip: {fileID: 0}
+  bonfireLevelUpClip: {fileID: 0}
 --- !u!4 &1118167533
 Transform:
   m_ObjectHideFlags: 0
@@ -3111,6 +3230,7 @@ GameObject:
   - component: {fileID: 1141073535}
   - component: {fileID: 1141073534}
   - component: {fileID: 1141073533}
+  - component: {fileID: 1141073538}
   m_Layer: 0
   m_Name: --- SOULS HUD CANVAS ---
   m_TagString: Untagged
@@ -3134,6 +3254,7 @@ MonoBehaviour:
   healthSlider: {fileID: 1085123320}
   healthEaseSlider: {fileID: 0}
   staminaSlider: {fileID: 1065545320}
+  soulsCounterText: {fileID: 0}
 --- !u!114 &1141073534
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3220,6 +3341,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &1141073538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141073532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41957db1fa737794392099dc36ae6158, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.UI.BonfireMenuHUD
 --- !u!1001 &1144910140
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4098,11 +4231,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c736ee39410a7a3449c6471afdecc5fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.Player.PlayerStats
+  soulLevel: 1
+  currentSouls: 500
+  vigor: 10
+  endurance: 10
+  strength: 10
+  dexterity: 10
+  vitality: 10
   maxHealth: 100
   maxStamina: 120
   staminaRegenRate: 60
   staminaRegenDelay: 0.35
   maxPoise: 50
+  physicalDefense: 10
+  bonusAttackDamage: 0
   isInvulnerable: 0
   isDead: 0
 --- !u!4 &1374554691
@@ -4177,6 +4319,7 @@ MonoBehaviour:
   attackWindupTime: 0.48
   attackActiveTime: 0.44
   attackRecoveryTime: 0.22
+  isResting: 0
 --- !u!143 &1374554694
 CharacterController:
   m_ObjectHideFlags: 0
@@ -5758,6 +5901,7 @@ MonoBehaviour:
   comboSlash1Damage: 30
   comboSlash2Damage: 35
   phase2AttackCooldown: 1
+  phase2ParryChance: 0.3
 --- !u!114 &1941788693
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5791,8 +5935,8 @@ MonoBehaviour:
   weaponRotationOffset: {x: 0, y: 0, z: 0}
   shieldInstance: {fileID: 1713041471}
   shieldPositionOffset: {x: 0, y: 0, z: 0}
-  shieldRotationOffset: {x: 90, y: 0, z: 180}
-  initializedFromScene: 0
+  shieldRotationOffset: {x: 90, y: 180, z: 0}
+  initializedFromScene: 1
 --- !u!114 &1941788695
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6350,3 +6494,5 @@ SceneRoots:
   - {fileID: 1941788697}
   - {fileID: 1938776707}
   - {fileID: 1118167533}
+  - {fileID: 212606187}
+  - {fileID: 403207378}
