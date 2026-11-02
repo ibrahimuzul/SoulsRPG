@@ -38,6 +38,19 @@ namespace SoulsRPG.CameraSystem
         private LockOnTarget currentLockedTarget;
         private static readonly List<LockOnTarget> allLockTargets = new List<LockOnTarget>();
 
+        // Camera Shake State
+        private Vector3 shakeOffset = Vector3.zero;
+        private float shakeTimer = 0f;
+        private float shakeTotalDuration = 0.45f;
+        private float shakeMagnitude = 0f;
+
+        public void TriggerShake(float magnitude = 0.35f, float duration = 0.45f)
+        {
+            shakeMagnitude = magnitude;
+            shakeTotalDuration = Mathf.Max(0.05f, duration);
+            shakeTimer = shakeTotalDuration;
+        }
+
         public bool IsLockedOn => currentLockedTarget != null;
         public LockOnTarget CurrentLockedTarget => currentLockedTarget;
 
@@ -157,7 +170,19 @@ namespace SoulsRPG.CameraSystem
 
             currentDistance = Mathf.Lerp(currentDistance, targetDist, Time.deltaTime * 20f);
 
-            Vector3 finalCamPos = targetFocusPos + cameraDirection * currentDistance;
+            // Apply camera shake if active
+            if (shakeTimer > 0f)
+            {
+                shakeTimer -= Time.deltaTime;
+                float damp = Mathf.Clamp01(shakeTimer / shakeTotalDuration);
+                shakeOffset = Random.insideUnitSphere * (shakeMagnitude * damp);
+            }
+            else
+            {
+                shakeOffset = Vector3.zero;
+            }
+
+            Vector3 finalCamPos = targetFocusPos + cameraDirection * currentDistance + shakeOffset;
             transform.position = finalCamPos;
             transform.LookAt(targetFocusPos + (IsLockedOn ? Vector3.up * 0.25f : Vector3.zero));
         }

@@ -70,6 +70,7 @@ namespace SoulsRPG.Boss
         private bool isInvulnerable = false;
         private bool isBlocking = false;
         private bool isHUDActivated = false;
+        private bool isLeaping = false;
 
         private float attackCooldownTimer = 0f;
         private float blockTimer = 0f;
@@ -209,6 +210,8 @@ namespace SoulsRPG.Boss
 
         private void ApplyGravity()
         {
+            if (isLeaping) return; // Zıplama esnasında yerçekimi hareketi atlanır
+
             if (characterController.isGrounded)
             {
                 verticalVelocity = -2f;
@@ -233,6 +236,13 @@ namespace SoulsRPG.Boss
         private void UpdateApproachingState(float distToPlayer)
         {
             RotateTowards(playerTarget.position);
+
+            // Faz 2 Gap-Closing Jump Slam! (Oyuncu 3.8m - 14.0m arasındaysa doğrudan zıplayarak deprem vuruşuyla arayı kapatır)
+            if (isPhase2 && attackCooldownTimer <= 0f && distToPlayer >= 3.8f && distToPlayer <= 14.0f)
+            {
+                activeAttackRoutine = StartCoroutine(GroundSlamShockwaveRoutine());
+                return;
+            }
 
             float speed = isPhase2 ? phase2Speed : walkSpeed;
             SetAnimationSpeed(isPhase2 ? 1.0f : 0.5f);
@@ -309,11 +319,11 @@ namespace SoulsRPG.Boss
             {
                 // Phase 2 Attacks (Furious & Devastating)
                 float roll = Random.value;
-                if (roll < 0.40f)
+                if (roll < 0.50f)
                 {
                     activeAttackRoutine = StartCoroutine(GroundSlamShockwaveRoutine());
                 }
-                else if (roll < 0.75f)
+                else if (roll < 0.80f)
                 {
                     activeAttackRoutine = StartCoroutine(FuriousDoubleComboRoutine());
                 }
@@ -409,40 +419,73 @@ namespace SoulsRPG.Boss
         private IEnumerator GroundSlamShockwaveRoutine()
         {
             currentState = BossAIState.Attacking;
+            isLeaping = true;
             SetAnimationSpeed(0f);
+            SetBlocking(false);
+
+            // Hedefe doğru dön
+            if (playerTarget != null) RotateTowards(playerTarget.position);
+
+            Vector3 startPos = transform.position;
+            Vector3 targetLandingPos = transform.position + transform.forward * 2.5f;
+
+            if (playerTarget != null)
+            {
+                Vector3 toPlayer = playerTarget.position - transform.position;
+                toPlayer.y = 0;
+                float dist = toPlayer.magnitude;
+                // En fazla 10 metre ileri zıpla, oyuncunun ~1.2m önünü hedefle
+                float leapDist = Mathf.Min(dist - 1.2f, 10.0f);
+                if (leapDist > 0.5f)
+                {
+                    targetLandingPos = transform.position + toPlayer.normalized * leapDist;
+                }
+            }
+
             if (animator != null) animator.SetTrigger("isAttacking");
+            SoulsAudioManager.GetOrCreate().PlayBossOverhead(transform.position + Vector3.up * 2f);
 
-            FindWeaponCollider();
+            // Parabolik Zıplama Eğrisi (3.2m yükseklik, 0.68s havada kalış)
+            float leapDuration = 0.68f;
+            float elapsed = 0f;
+            float arcHeight = 3.2f;
 
-            // 1. High Leap into the air
-            Vector3 leapDir = (playerTarget.position - transform.position).normalized;
-            leapDir.y = 0;
-            float leapElapsed = 0f;
-            while (leapElapsed < 0.48f)
+            while (elapsed < leapDuration)
             {
-                leapElapsed += Time.deltaTime;
-                characterController.Move((leapDir * 3.5f + Vector3.up * 3.2f) * Time.deltaTime);
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / leapDuration);
+
+                Vector3 currentXZ = Vector3.Lerp(startPos, targetLandingPos, t);
+                float currentY = startPos.y + Mathf.Sin(t * Mathf.PI) * arcHeight;
+                Vector3 desiredPos = new Vector3(currentXZ.x, currentY, currentXZ.z);
+
+                Vector3 delta = desiredPos - transform.position;
+                characterController.Move(delta);
+
                 yield return null;
             }
 
-            // 2. Downward impact slam!
-            float downElapsed = 0f;
-            while (downElapsed < 0.22f)
-            {
-                downElapsed += Time.deltaTime;
-                characterController.Move((Vector3.down * 12.0f) * Time.deltaTime);
-                yield return null;
-            }
+            // 2. Yere Sert İniş & Şok Dalgası!
+            isLeaping = false;
+            verticalVelocity = -4f;
 
-            // 3. Impact & Explosive AOE Shockwave! (Tekil ve dengeli hasar)
-            Vector3 impactPos = transform.position + transform.forward * 1.2f;
+            Vector3 impactPos = transform.position + transform.forward * 1.0f;
             SoulsAudioManager.GetOrCreate().PlayBossSlam(impactPos);
 
+            // Kamera Sarsıntısı
+            if (CameraManager.Instance != null)
+            {
+                CameraManager.Instance.TriggerShake(0.38f, 0.45f);
+            }
+
+            // Şok Dalgası (Zemin üstünde net görünen alev halkası ve ışık)
             var shockwaveGo = new GameObject("BossGroundShockwave");
             var shockwave = shockwaveGo.AddComponent<BossShockwave>();
             shockwave.Initialize(transform, shockwaveDamage, shockwaveRadius);
 
-            yield return new WaitForSeconds(0.60f);
+            Debug.Log("<color=red><b>[Boss Malakor] 💥 ZEMİN DEPREMİ (GROUND SLAM)!</b></color>");
+
+            yield return new WaitForSeconds(0.65f);
             EndAttack();
         }
 
@@ -523,8 +566,8 @@ namespace SoulsRPG.Boss
             yield return new WaitForSeconds(2.4f);
 
             isInvulnerable = false;
-            currentState = BossAIState.CombatStance;
-            attackCooldownTimer = 0.5f; // Hemen saldırıya hazır!
+            // Faz 2 başlar başlamaz İLK SALDIRI olarak garanti zemin depremi yap!
+            activeAttackRoutine = StartCoroutine(GroundSlamShockwaveRoutine());
         }
 
         private void StowShield()
