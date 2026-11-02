@@ -30,6 +30,11 @@ namespace SoulsRPG.Audio
         [Tooltip("Takla / kaçınma rüzgar sesi")]
         [SerializeField] private AudioClip[] rollClips;
 
+        [Header("Boss Audio Clips (Boss Özel Sesleri)")]
+        [SerializeField] private AudioClip bossRoarClip;
+        [SerializeField] private AudioClip bossSlamClip;
+        [SerializeField] private AudioClip bossOverheadClip;
+
         // 3D Spatial Audio için AudioSource Havuzu (Pool)
         private readonly List<AudioSource> audioSourcePool = new List<AudioSource>();
         private const int PoolInitialSize = 10;
@@ -101,6 +106,39 @@ namespace SoulsRPG.Audio
             PlayRandomClip(rollClips, position, rollVolume * masterVolume, 0.95f, 1.05f);
         }
 
+        public void PlayBossRoar(Vector3 position)
+        {
+            if (bossRoarClip == null) return;
+            var src = GetAvailableSource();
+            src.transform.position = position;
+            src.clip = bossRoarClip;
+            src.volume = masterVolume;
+            src.pitch = 1.0f;
+            src.Play();
+        }
+
+        public void PlayBossSlam(Vector3 position)
+        {
+            if (bossSlamClip == null) return;
+            var src = GetAvailableSource();
+            src.transform.position = position;
+            src.clip = bossSlamClip;
+            src.volume = masterVolume;
+            src.pitch = Random.Range(0.96f, 1.04f);
+            src.Play();
+        }
+
+        public void PlayBossOverhead(Vector3 position)
+        {
+            if (bossOverheadClip == null) return;
+            var src = GetAvailableSource();
+            src.transform.position = position;
+            src.clip = bossOverheadClip;
+            src.volume = masterVolume * 0.95f;
+            src.pitch = Random.Range(0.94f, 1.05f);
+            src.Play();
+        }
+
         private void PlayRandomClip(AudioClip[] clips, Vector3 position, float volume, float minPitch, float maxPitch)
         {
             if (clips == null || clips.Length == 0) return;
@@ -137,6 +175,18 @@ namespace SoulsRPG.Audio
             if (rollClips == null || rollClips.Length == 0)
             {
                 rollClips = LoadClipsFromPath("Assets/_Project/Audio/ROLL_Dodge_");
+            }
+            if (bossRoarClip == null)
+            {
+                bossRoarClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/BOSS_Roar_PhaseTransition.wav");
+            }
+            if (bossSlamClip == null)
+            {
+                bossSlamClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/BOSS_GroundSlam_Impact.wav");
+            }
+            if (bossOverheadClip == null)
+            {
+                bossOverheadClip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/BOSS_Overhead_Smash.wav");
             }
 #endif
         }
