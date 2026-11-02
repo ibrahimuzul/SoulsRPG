@@ -93,6 +93,9 @@ namespace SoulsRPG.EditorTools
             // HUD
             CreateSoulsHUD(player.GetComponent<PlayerStats>());
 
+            // Audio Manager
+            CreateAudioManager();
+
             // Save Scene
             string scenePath = "Assets/_Project/Scenes/SoulsTestArena.unity";
             EditorSceneManager.SaveScene(scene, scenePath);
@@ -100,6 +103,32 @@ namespace SoulsRPG.EditorTools
             AssetDatabase.Refresh();
 
             Debug.Log($"<color=green><b>[SoulsRPG] Sahne Kuruldu!</b></color>");
+        }
+
+        [MenuItem("SoulsRPG/6. Setup Audio Manager (Sahneye Ses Yoneticisi Ekle)", false, 5)]
+        public static void SetupAudioManagerMenu()
+        {
+            var existing = Object.FindAnyObjectByType<Audio.SoulsAudioManager>();
+            if (existing != null)
+            {
+                existing.AutoLoadClipsIfEmpty();
+                EditorUtility.SetDirty(existing);
+                Debug.Log("<color=green><b>[SoulsRPG] SoulsAudioManager zaten sahnede mevcut, sesler yenilendi!</b></color>");
+                return;
+            }
+
+            var audioGo = CreateAudioManager();
+            Undo.RegisterCreatedObjectUndo(audioGo, "Create Souls Audio Manager");
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            Debug.Log("<color=green><b>[SoulsRPG] '--- SOULS AUDIO MANAGER ---' basariyla sahneye eklendi ve sesler baglandi!</b></color>");
+        }
+
+        private static GameObject CreateAudioManager()
+        {
+            var audioGo = new GameObject("--- SOULS AUDIO MANAGER ---");
+            var manager = audioGo.AddComponent<Audio.SoulsAudioManager>();
+            manager.AutoLoadClipsIfEmpty();
+            return audioGo;
         }
 
         [MenuItem("SoulsRPG/5. Reload Input Settings (Gamepad Girdilerini Yenile)", false, 4)]

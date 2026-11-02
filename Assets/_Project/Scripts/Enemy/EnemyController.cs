@@ -543,6 +543,7 @@ namespace SoulsRPG.Enemy
             }
 
             // 2. Active Swing (Topuz savruluyor, hasar alanı AKTİF! - ayaklar yerde sabit)
+            Audio.SoulsAudioManager.GetOrCreate().PlaySwing(transform.position + transform.forward * 0.8f + Vector3.up * 1.2f);
             if (weaponCollider != null)
             {
                 weaponCollider.EnableDamageCollider(attackDamage);
@@ -598,6 +599,7 @@ namespace SoulsRPG.Enemy
                 if (dot > -0.15f)
                 {
                     // Düşman kalkanıyla darbeyi engelledi!
+                    Audio.SoulsAudioManager.GetOrCreate().PlayBlock(hitPoint);
                     SpawnBlockSparks(hitPoint, toAttacker.normalized);
                     CombatDebugVisualizer.SpawnContactPoint(hitPoint, toAttacker.normalized, true, "🛡️ DÜŞMAN KALKAN TEMASI");
                     return;
@@ -606,6 +608,7 @@ namespace SoulsRPG.Enemy
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             healthBarTimer = 5.0f;
+            Audio.SoulsAudioManager.GetOrCreate().PlayHit(hitPoint);
 
             // Uçan hasar rakamı
             SpawnFloatingDamageNumber(damage, hitPoint);

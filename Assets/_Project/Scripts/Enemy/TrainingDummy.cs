@@ -100,6 +100,7 @@ namespace SoulsRPG.Enemy
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             healthBarTimer = healthBarDisplayDuration;
+            Audio.SoulsAudioManager.GetOrCreate().PlayHit(hitPoint);
 
             // 1. Uçan Hasar Rakamı Oluştur
             SpawnFloatingDamageNumber(damage, hitPoint);

@@ -337,6 +337,7 @@ namespace SoulsRPG.Player
         {
             isRolling = true;
             rollDirection = direction;
+            Audio.SoulsAudioManager.GetOrCreate().PlayRoll(transform.position);
 
             transform.rotation = Quaternion.LookRotation(rollDirection);
 
@@ -457,6 +458,7 @@ namespace SoulsRPG.Player
             }
 
             // 2. Active Damage Window (Silah savruluyor, hasar alanı AKTİF! - ayaklar yerde sabit)
+            Audio.SoulsAudioManager.GetOrCreate().PlaySwing(transform.position + transform.forward * 0.8f + Vector3.up * 1.2f);
             if (weaponCollider != null)
             {
                 weaponCollider.EnableDamageCollider(attackDamage);

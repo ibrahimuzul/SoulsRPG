@@ -149,6 +149,7 @@ namespace SoulsRPG.Player
                         locomotion.TriggerBlockRecoil();
                     }
 
+                    Audio.SoulsAudioManager.GetOrCreate().PlayBlock(hitPoint);
                     SpawnBlockEffect(hitPoint, toAttacker.normalized);
                     CombatDebugVisualizer.SpawnContactPoint(hitPoint, toAttacker.normalized, true, "🛡️ OYUNCU KALKAN TEMASI");
                     return; // Can hasarını kesinlikle engeller!
@@ -156,6 +157,7 @@ namespace SoulsRPG.Player
             }
 
             // Normal Hasar
+            Audio.SoulsAudioManager.GetOrCreate().PlayHit(hitPoint != Vector3.zero ? hitPoint : transform.position + Vector3.up * 1.2f);
             TakeDamage(damage, attacker, 15f);
         }
 
