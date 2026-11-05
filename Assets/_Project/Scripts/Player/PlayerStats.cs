@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using SoulsRPG.Combat;
+using SoulsRPG.Core;
 using SoulsRPG.Save;
 
 namespace SoulsRPG.Player
@@ -13,6 +14,8 @@ namespace SoulsRPG.Player
     {
         public static PlayerStats Instance { get; private set; }
 
+        public const int BaseAttackDamage = 25;
+
         [Header("Dark Souls Level & Souls")]
         [SerializeField] private int soulLevel = 1;
         [SerializeField] private int currentSouls = 500; // Başlangıçta seviye atlamayı test etmek için 500 ruh
@@ -21,7 +24,7 @@ namespace SoulsRPG.Player
         [SerializeField] private int vigor = 10;      // Can (Max HP)
         [SerializeField] private int endurance = 10;  // Dayanıklılık (Max Stamina & Yenilenme)
         [SerializeField] private int strength = 10;   // Saldırı Gücü (Attack Damage)
-        [SerializeField] private int dexterity = 10;  // Çeviklik & Vuruş Verimliliği
+        [SerializeField] private int dexterity = 10;  // Hasar + Saldırı Hızı
         [SerializeField] private int vitality = 10;   // Denge & Zırh (Poise & Defense)
 
         [Header("Derived Combat Stats")]
@@ -35,7 +38,12 @@ namespace SoulsRPG.Player
         private float regenTimer = 0f;
 
         [SerializeField] private float maxPoise = 50f;
+        [Tooltip("Son darbeden bu kadar saniye sonra poise tamamen yenilenir")]
+        [SerializeField] private float poiseResetDelay = 4f;
+        [Tooltip("Poise kırılınca oyuncunun sendeleme süresi")]
+        [SerializeField] private float poiseBreakStaggerDuration = 0.6f;
         private float currentPoise;
+        private float poiseResetTimer = 0f;
 
         [SerializeField] private int physicalDefense = 10;
         [SerializeField] private int bonusAttackDamage = 0;
@@ -52,6 +60,7 @@ namespace SoulsRPG.Player
         public event Action<int> OnSoulsChanged;
         public event Action OnStatsUpdated;
         public event Action OnDeath;
+        public event Action OnRespawn;
 
         // Public Properties
         public int SoulLevel => soulLevel;
@@ -66,14 +75,41 @@ namespace SoulsRPG.Player
         public int MaxHealth => maxHealth;
         public float CurrentStamina => currentStamina;
         public float MaxStamina => maxStamina;
+        public float CurrentPoise => currentPoise;
+        public float MaxPoise => maxPoise;
         public int PhysicalDefense => physicalDefense;
         public int BonusAttackDamage => bonusAttackDamage;
 
+        /// <summary>Hafif saldırının toplam hasarı (taban + Kuvvet + Beceri).</summary>
+        public int AttackDamage => BaseAttackDamage + bonusAttackDamage;
+
+        /// <summary>Beceri ile artan saldırı hızı çarpanı (en fazla %25).</summary>
+        public float AttackSpeedMultiplier => CalculateAttackSpeed(dexterity);
+
         public Vector3? LastBonfirePosition { get; private set; }
+
+        // Ruh lekesi (Bloodstain): ölünce kaybedilen ruhlar
+        public Vector3? BloodstainPosition { get; private set; }
+        public int BloodstainSouls { get; private set; }
+
+        public static int CalculateBonusDamage(int str, int dex)
+        {
+            return (str - 10) * 2 + (dex - 10);
+        }
+
+        public static float CalculateAttackSpeed(int dex)
+        {
+            return 1f + Mathf.Clamp((dex - 10) * 0.01f, 0f, 0.25f);
+        }
 
         private void Awake()
         {
             Instance = this;
+
+            if (GetComponent<PlayerDeathHandler>() == null)
+            {
+                gameObject.AddComponent<PlayerDeathHandler>();
+            }
 
             // Kayıtlı veriyi yükle (veya varsayılanları hesapla)
             LoadSavedData();
@@ -95,6 +131,7 @@ namespace SoulsRPG.Player
         private void Update()
         {
             HandleStaminaRegeneration();
+            HandlePoiseReset();
         }
 
         /// <summary>
@@ -109,8 +146,8 @@ namespace SoulsRPG.Player
             maxStamina = 120f + (endurance - 10) * 5f;
             staminaRegenRate = 60f + (endurance - 10) * 2f;
 
-            // 3. Kuvvet (Strength): Her strength için +2 taban saldırı hasarı bonusu
-            bonusAttackDamage = (strength - 10) * 2;
+            // 3. Kuvvet (Strength) +2 / Beceri (Dexterity) +1 hasar; Beceri ayrıca saldırı hızını artırır
+            bonusAttackDamage = CalculateBonusDamage(strength, dexterity);
 
             // 4. Direnç (Vitality): Poise ve Fiziksel Savunma artışı
             maxPoise = 50f + (vitality - 10) * 4f;
@@ -122,18 +159,12 @@ namespace SoulsRPG.Player
             {
                 currentHealth = maxHealth;
                 currentStamina = maxStamina;
+                currentPoise = maxPoise;
             }
 
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
             OnStaminaChanged?.Invoke(currentStamina, maxStamina);
             OnStatsUpdated?.Invoke();
-
-            // Oyuncu saldırı hasarını güncelle
-            var loco = PlayerLocomotion.Instance;
-            if (loco != null)
-            {
-                loco.UpdateAttackDamage(25 + bonusAttackDamage);
-            }
         }
 
         /// <summary>
@@ -156,7 +187,7 @@ namespace SoulsRPG.Player
             if (amount <= 0) return;
             currentSouls += amount;
             OnSoulsChanged?.Invoke(currentSouls);
-            Debug.Log($"<color=yellow><b>[PlayerStats] +{amount:N0} RUH KAZANILDI! (Toplam: {currentSouls:N0})</b></color>");
+            GameLog.Info($"[PlayerStats] +{amount:N0} ruh (Toplam: {currentSouls:N0})");
         }
 
         public bool SpendSouls(int amount)
@@ -207,17 +238,18 @@ namespace SoulsRPG.Player
             SaveManager.SavePlayer(this);
 
             OnSoulsChanged?.Invoke(currentSouls);
-            Debug.Log($"<color=cyan><b>[PlayerStats] SEVİYE ATLAMA BAŞARILI! Seviye: {soulLevel}, Kalan Ruh: {currentSouls:N0}</b></color>");
+            GameLog.Info($"[PlayerStats] Seviye atlandı. Seviye: {soulLevel}, Kalan Ruh: {currentSouls:N0}");
             return true;
         }
 
         /// <summary>
-        /// Bonfire'a oturulduğunda can ve dayanıklılığı tamamen doldurur ve oyunu kaydeder.
+        /// Bonfire'a oturulduğunda can ve dayanıklılığı tamamen doldurur, dünyayı sıfırlar ve oyunu kaydeder.
         /// </summary>
         public void RestAtBonfire(Vector3 bonfirePosition)
         {
             currentHealth = maxHealth;
             currentStamina = maxStamina;
+            currentPoise = maxPoise;
             LastBonfirePosition = bonfirePosition;
 
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
@@ -226,8 +258,58 @@ namespace SoulsRPG.Player
             // Sesi çal
             Audio.SoulsAudioManager.GetOrCreate().PlayBonfireRest(bonfirePosition);
 
+            // Souls kuralı: dinlenince düşmanlar yeniden doğar
+            WorldEvents.ResetWorld();
+
             // Kaydet
             SaveManager.SavePlayer(this, bonfirePosition);
+        }
+
+        // ==========================================
+        // ÖLÜM, RUH LEKESİ VE YENİDEN DOĞMA
+        // ==========================================
+
+        /// <summary>
+        /// Ölümde taşınan tüm ruhları kaybeder ve ölüm noktasına ruh lekesi bırakır.
+        /// Önceki (alınmamış) leke varsa o ruhlar sonsuza dek kaybolur.
+        /// </summary>
+        public void DropSoulsAsBloodstain(Vector3 position)
+        {
+            BloodstainSouls = currentSouls;
+            BloodstainPosition = currentSouls > 0 ? position : (Vector3?)null;
+            currentSouls = 0;
+            OnSoulsChanged?.Invoke(currentSouls);
+        }
+
+        /// <summary>Ruh lekesine dokununca kaybedilen ruhları geri alır.</summary>
+        public int RecoverBloodstain()
+        {
+            int amount = BloodstainSouls;
+            BloodstainSouls = 0;
+            BloodstainPosition = null;
+            if (amount > 0)
+            {
+                currentSouls += amount;
+                OnSoulsChanged?.Invoke(currentSouls);
+            }
+            SaveManager.SavePlayer(this);
+            return amount;
+        }
+
+        /// <summary>Ölümden sonra tam can/stamina ile yeniden doğar.</summary>
+        public void Respawn()
+        {
+            isDead = false;
+            isInvulnerable = false;
+            currentHealth = maxHealth;
+            currentStamina = maxStamina;
+            currentPoise = maxPoise;
+            regenTimer = 0f;
+            poiseResetTimer = 0f;
+
+            OnHealthChanged?.Invoke(currentHealth, maxHealth);
+            OnStaminaChanged?.Invoke(currentStamina, maxStamina);
+            OnRespawn?.Invoke();
         }
 
         private void LoadSavedData()
@@ -246,6 +328,12 @@ namespace SoulsRPG.Player
                 if (data.hasSavedBonfire)
                 {
                     LastBonfirePosition = new Vector3(data.respawnX, data.respawnY, data.respawnZ);
+                }
+
+                if (data.hasBloodstain && data.bloodstainSouls > 0)
+                {
+                    BloodstainSouls = data.bloodstainSouls;
+                    BloodstainPosition = new Vector3(data.bloodstainX, data.bloodstainY, data.bloodstainZ);
                 }
             }
         }
@@ -277,17 +365,29 @@ namespace SoulsRPG.Player
             }
         }
 
+        private void HandlePoiseReset()
+        {
+            if (isDead || currentPoise >= maxPoise) return;
+
+            poiseResetTimer -= Time.deltaTime;
+            if (poiseResetTimer <= 0f)
+            {
+                currentPoise = maxPoise;
+            }
+        }
+
+        /// <summary>
+        /// Souls kuralı: stamina 0'ın üzerindeyse eylem yapılabilir (bar eksiye düşmez, 0'da kalır).
+        /// Stamina tamamen bitmişse eylem reddedilir.
+        /// </summary>
         public bool UseStamina(float amount)
         {
-            if (currentStamina < amount)
+            if (currentStamina <= 0f)
             {
-                currentStamina = 0f;
-                regenTimer = staminaRegenDelay;
-                OnStaminaChanged?.Invoke(currentStamina, maxStamina);
-                return true;
+                return false;
             }
 
-            currentStamina -= amount;
+            currentStamina = Mathf.Max(0f, currentStamina - amount);
             regenTimer = staminaRegenDelay;
             OnStaminaChanged?.Invoke(currentStamina, maxStamina);
             return true;
@@ -298,7 +398,7 @@ namespace SoulsRPG.Player
             return currentStamina >= amount;
         }
 
-        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null)
+        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null, float poiseMultiplier = 1f)
         {
             if (isDead || isInvulnerable)
             {
@@ -347,10 +447,11 @@ namespace SoulsRPG.Player
                 }
             }
 
-            // Normal Hasar (Fiziksel savunma ile hafif hafif hasar kırma)
+            // Normal Hasar (Fiziksel savunma ile hafif hasar kırma)
             int effectiveDamage = Mathf.Max(1, damage - (physicalDefense / 3));
+            float poiseDamage = Mathf.Max(10f, damage * 0.75f) * poiseMultiplier;
             Audio.SoulsAudioManager.GetOrCreate().PlayHit(hitPoint != Vector3.zero ? hitPoint : transform.position + Vector3.up * 1.2f);
-            TakeDamage(effectiveDamage, attacker, 15f);
+            TakeDamage(effectiveDamage, attacker, poiseDamage);
         }
 
         private void SpawnBlockEffect(Vector3 point, Vector3 direction)
@@ -370,6 +471,8 @@ namespace SoulsRPG.Player
 
             var pEmission = ps.emission;
             pEmission.SetBursts(new ParticleSystem.Burst[] { new ParticleSystem.Burst(0f, 14) });
+
+            RuntimeShaders.ApplyParticleMaterial(ps, Color.white);
         }
 
         public void TakeDamage(int damage, Transform attacker = null, float poiseDamage = 10f)
@@ -383,15 +486,24 @@ namespace SoulsRPG.Player
             if (currentHealth < 0) currentHealth = 0;
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
 
-            currentPoise -= poiseDamage;
-            if (currentPoise <= 0f)
-            {
-                currentPoise = maxPoise;
-            }
-
             if (currentHealth <= 0)
             {
                 Die();
+                return;
+            }
+
+            // Poise: kırılırsa oyuncu sendeler ve saldırısı iptal olur
+            currentPoise -= poiseDamage;
+            poiseResetTimer = poiseResetDelay;
+            if (currentPoise <= 0f)
+            {
+                currentPoise = maxPoise;
+                var locomotion = PlayerLocomotion.Instance;
+                if (locomotion != null)
+                {
+                    Vector3 pushDir = attacker != null ? (transform.position - attacker.position) : -transform.forward;
+                    locomotion.TriggerHitStagger(poiseBreakStaggerDuration, pushDir);
+                }
             }
         }
 
@@ -405,9 +517,18 @@ namespace SoulsRPG.Player
 
         private void Die()
         {
+            if (isDead) return;
             isDead = true;
+            isInvulnerable = false;
+
+            var locomotion = PlayerLocomotion.Instance;
+            if (locomotion != null)
+            {
+                locomotion.OnPlayerDied();
+            }
+
             OnDeath?.Invoke();
-            Debug.Log("<color=red>YOU DIED</color>");
+            GameLog.Info("[PlayerStats] YOU DIED");
         }
     }
 }

@@ -84,8 +84,29 @@ namespace SoulsRPG.UI
         {
             if (bossTitleText != null)
             {
+                if (!hasOriginalTitleColor)
+                {
+                    originalTitleColor = bossTitleText.color;
+                    hasOriginalTitleColor = true;
+                }
                 bossTitleText.text = phase2Title;
                 bossTitleText.color = new Color(1.0f, 0.45f, 0.2f); // Fiery orange/red
+            }
+        }
+
+        private Color originalTitleColor;
+        private bool hasOriginalTitleColor;
+
+        /// <summary>Boss sıfırlanınca (oyuncu ölünce) can barını hemen gizler.</summary>
+        public void HideBoss()
+        {
+            isBossActive = false;
+            StopAllCoroutines();
+            HideBossBarImmediate();
+            HideVictoryBannerImmediate();
+            if (bossTitleText != null && hasOriginalTitleColor)
+            {
+                bossTitleText.color = originalTitleColor;
             }
         }
 

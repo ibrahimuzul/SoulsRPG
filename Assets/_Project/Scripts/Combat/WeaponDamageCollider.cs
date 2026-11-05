@@ -95,9 +95,17 @@ namespace SoulsRPG.Combat
             rb.useGravity = false;
         }
 
-        public void EnableDamageCollider(int damage)
+        // Bu savurmaya özel ayarlar (ağır saldırı daha fazla poise hasarı verir ve isabette ekranı sarsar)
+        private float currentPoiseMultiplier = 1f;
+        private float currentHitShake = 0f;
+
+        /// <param name="poiseMultiplier">Hedefe verilecek poise hasarı çarpanı</param>
+        /// <param name="hitShake">İsabette kamera sarsıntı şiddeti (0 = yok)</param>
+        public void EnableDamageCollider(int damage, float poiseMultiplier = 1f, float hitShake = 0f)
         {
             currentDamage = damage;
+            currentPoiseMultiplier = poiseMultiplier;
+            currentHitShake = hitShake;
             alreadyHitColliders.Clear();
             alreadyHitDamageables.Clear();
             isDamageActive = true;
@@ -152,7 +160,12 @@ namespace SoulsRPG.Combat
                 Vector3 hitDirection = (other.transform.position - attackerPos).normalized;
                 hitDirection.y = 0; // Yatay darbe yönü
 
-                damageable.TakeDamage(currentDamage, hitPoint, hitDirection, attacker);
+                damageable.TakeDamage(currentDamage, hitPoint, hitDirection, attacker, currentPoiseMultiplier);
+
+                if (currentHitShake > 0f && CameraSystem.CameraManager.Instance != null)
+                {
+                    CameraSystem.CameraManager.Instance.TriggerShake(currentHitShake, 0.22f);
+                }
 
                 // Temas Noktası Göstergesi (Hem Oyuncuda Hem Düşmanda Görünür)
                 string attackerLabel = attacker.name;
@@ -201,6 +214,7 @@ namespace SoulsRPG.Combat
 
             var pRenderer = sparkObj.GetComponent<ParticleSystemRenderer>();
             pRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+            Core.RuntimeShaders.ApplyParticleMaterial(ps, Color.white);
 
             ps.Play();
             Destroy(sparkObj, 1.0f);

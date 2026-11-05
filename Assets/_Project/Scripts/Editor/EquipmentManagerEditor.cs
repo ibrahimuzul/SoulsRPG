@@ -101,5 +101,28 @@ namespace SoulsRPG.EditorTools
                 EditorUtility.SetDirty(eq);
             }
         }
+
+        /// <summary>Tüm karakterlerin silah ofsetini orijinal (0,0,0) tutuşa döndürür.</summary>
+        [MenuItem("SoulsRPG/Equipment/Silahları Orijinal Tutuşa Döndür (0,0,0)")]
+        public static void ResetWeaponGripToOriginal()
+        {
+            int count = 0;
+            foreach (var e in Object.FindObjectsByType<EquipmentManager>())
+            {
+                if (e.weaponInstance == null) continue;
+                Undo.RecordObject(e, "Reset Weapon Grip");
+                Undo.RecordObject(e.weaponInstance.transform, "Reset Weapon Grip");
+                e.weaponPositionOffset = Vector3.zero;
+                e.weaponRotationOffset = Vector3.zero;
+                e.UpdateTransforms();
+                EditorUtility.SetDirty(e);
+                if (e.gameObject.scene.isLoaded)
+                {
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(e.gameObject.scene);
+                }
+                count++;
+            }
+            Debug.Log($"[SoulsRPG] {count} karakterin silah tutuşu (0,0,0) değerine döndürüldü.");
+        }
     }
 }

@@ -8,8 +8,13 @@ namespace SoulsRPG.Combat
     /// </summary>
     public static class CombatDebugVisualizer
     {
+        /// <summary>Temas noktası ve hitbox görselleri. Oyunda F2 ile aç / kapat.</summary>
+        public static bool Enabled = true;
+
         public static void SpawnContactPoint(Vector3 hitPoint, Vector3 hitDirection, bool isBlock = false, string label = null)
         {
+            if (!Enabled) return;
+
             // 1. Oyun Dünyasında 3D Parlayan Temas Küresi
             GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marker.name = isBlock ? "BlockContactMarker" : "HitContactMarker";
@@ -24,10 +29,7 @@ namespace SoulsRPG.Combat
             var rend = marker.GetComponent<Renderer>();
             if (rend != null)
             {
-                Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit") 
-                                  ?? Shader.Find("Unlit/Color") 
-                                  ?? Shader.Find("Standard");
-                Material mat = new Material(unlitShader);
+                Material mat = new Material(Core.RuntimeShaders.Find(Core.RuntimeShaders.UnlitColor, Core.RuntimeShaders.Standard));
                 Color c = isBlock ? new Color(0.2f, 0.85f, 1.0f, 0.95f) : new Color(1.0f, 0.2f, 0.2f, 0.95f);
                 mat.color = c;
                 if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", c);
@@ -64,6 +66,7 @@ namespace SoulsRPG.Combat
 
         public static void DrawDebugBox(Vector3 center, Vector3 size, Quaternion rotation, Color color)
         {
+            if (!Enabled) return;
             Vector3 extents = size * 0.5f;
 
             Vector3[] points = new Vector3[]

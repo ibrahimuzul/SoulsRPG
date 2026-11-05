@@ -94,7 +94,7 @@ namespace SoulsRPG.Enemy
             TakeDamage(damage, transform.position + Vector3.up * 1.2f, defaultDir);
         }
 
-        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null)
+        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null, float poiseMultiplier = 1f)
         {
             if (isDead) return;
 

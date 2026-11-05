@@ -77,10 +77,7 @@ namespace SoulsRPG.Environment
                 mound.transform.localScale = new Vector3(1.6f, 0.12f, 1.6f);
 
                 var r = mound.GetComponent<Renderer>();
-                var shader = Shader.Find("Standard");
-                var mat = new Material(shader);
-                mat.color = new Color(0.12f, 0.11f, 0.10f); // Charred ash
-                r.material = mat;
+                r.material = Core.RuntimeShaders.CreateMaterial(new Color(0.12f, 0.11f, 0.10f), Core.RuntimeShaders.Standard); // Charred ash
 
                 var col = mound.GetComponent<Collider>();
                 if (col != null) Destroy(col);
@@ -98,9 +95,7 @@ namespace SoulsRPG.Environment
                 sword.transform.localScale = new Vector3(0.08f, 1.35f, 0.16f);
 
                 var r = sword.GetComponent<Renderer>();
-                var shader = Shader.Find("Standard");
-                var mat = new Material(shader);
-                mat.color = new Color(0.25f, 0.22f, 0.20f); // Twisted iron
+                var mat = Core.RuntimeShaders.CreateMaterial(new Color(0.25f, 0.22f, 0.20f), Core.RuntimeShaders.Standard); // Twisted iron
                 if (mat.HasProperty("_EmissionColor"))
                 {
                     mat.EnableKeyword("_EMISSION");

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using SoulsRPG.CameraSystem;
 using SoulsRPG.Combat;
+using SoulsRPG.Core;
 using SoulsRPG.Player;
 using SoulsRPG.UI;
 using SoulsRPG.Audio;
@@ -89,6 +90,11 @@ namespace SoulsRPG.Boss
         private readonly List<Color> originalColors = new List<Color>();
         private Coroutine activeAttackRoutine;
         private Coroutine recoilRoutine;
+        private Coroutine staggerRoutine;
+        private GameObject stowedShield;
+
+        private Vector3 spawnPosition;
+        private Quaternion spawnRotation;
 
         public bool IsDead => isDead;
         public int CurrentHealth => currentHealth;
@@ -103,6 +109,8 @@ namespace SoulsRPG.Boss
 
             currentHealth = maxHealth;
             currentPoise = maxPoise;
+            spawnPosition = transform.position;
+            spawnRotation = transform.rotation;
 
             CacheRenderers();
         }
@@ -133,11 +141,82 @@ namespace SoulsRPG.Boss
             originalColors.Clear();
             foreach (var r in allRenderers)
             {
+                // Her renderer için bir giriş eklenir; aksi halde indeksler kayar ve yanlış renk geri yüklenir
                 if (r != null && r.material != null && r.material.HasProperty("_Color"))
                 {
                     originalColors.Add(r.material.color);
                 }
+                else
+                {
+                    originalColors.Add(Color.white);
+                }
             }
+        }
+
+        private void OnEnable()
+        {
+            WorldEvents.OnWorldReset += ResetBoss;
+        }
+
+        private void OnDisable()
+        {
+            WorldEvents.OnWorldReset -= ResetBoss;
+        }
+
+        /// <summary>
+        /// Oyuncu ölüp yeniden doğunca (veya bonfire'da dinlenince) yenilmemiş boss baştan başlar:
+        /// tam can, faz 1, kalkan geri, aura kapalı, HUD gizli, başlangıç noktası.
+        /// </summary>
+        public void ResetBoss()
+        {
+            if (isDead) return;
+
+            StopAllCoroutines();
+            activeAttackRoutine = null;
+            recoilRoutine = null;
+            staggerRoutine = null;
+            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+
+            currentHealth = maxHealth;
+            currentPoise = maxPoise;
+            isPhase2 = false;
+            isInvulnerable = false;
+            isLeaping = false;
+            isHUDActivated = false;
+            attackCooldownTimer = 0f;
+            verticalVelocity = 0f;
+            currentState = BossAIState.Idle;
+            SetBlocking(false);
+            SetAnimationSpeed(0f);
+
+            characterController.enabled = false;
+            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+            characterController.enabled = true;
+
+            if (stowedShield != null) stowedShield.SetActive(true);
+            if (phaseAura != null) phaseAura.DeactivateAura();
+
+            for (int i = 0; i < allRenderers.Length && i < originalColors.Count; i++)
+            {
+                if (allRenderers[i] != null && allRenderers[i].material != null && allRenderers[i].material.HasProperty("_Color"))
+                {
+                    allRenderers[i].material.color = originalColors[i];
+                }
+            }
+
+            if (BossHealthBarHUD.Instance != null) BossHealthBarHUD.Instance.HideBoss();
+        }
+
+        /// <summary>Devam eden saldırıyı keser; zıplama ortasında kesilirse yerçekimini geri açar.</summary>
+        private void StopActiveAttack()
+        {
+            if (activeAttackRoutine != null)
+            {
+                StopCoroutine(activeAttackRoutine);
+                activeAttackRoutine = null;
+            }
+            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            isLeaping = false;
         }
 
         private void Update()
@@ -153,6 +232,18 @@ namespace SoulsRPG.Boss
                 {
                     playerTarget = p.transform;
                     playerStats = p.GetComponent<PlayerStats>();
+                }
+                return;
+            }
+
+            // Oyuncu öldüyse saldırmayı bırak ve bekle (yeniden doğunca WorldEvents ile sıfırlanır)
+            if (playerStats != null && playerStats.isDead)
+            {
+                if (currentState == BossAIState.Approaching || currentState == BossAIState.CombatStance)
+                {
+                    currentState = BossAIState.Idle;
+                    SetBlocking(false);
+                    SetAnimationSpeed(0f);
                 }
                 return;
             }
@@ -483,7 +574,7 @@ namespace SoulsRPG.Boss
             var shockwave = shockwaveGo.AddComponent<BossShockwave>();
             shockwave.Initialize(transform, shockwaveDamage, shockwaveRadius);
 
-            Debug.Log("<color=red><b>[Boss Malakor] 💥 ZEMİN DEPREMİ (GROUND SLAM)!</b></color>");
+            GameLog.Info("[Boss Malakor] Zemin depremi (Ground Slam)");
 
             yield return new WaitForSeconds(0.65f);
             EndAttack();
@@ -532,8 +623,15 @@ namespace SoulsRPG.Boss
         private void TriggerPhaseTransition()
         {
             isPhase2 = true;
-            if (activeAttackRoutine != null) StopCoroutine(activeAttackRoutine);
-            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            StopActiveAttack();
+
+            // Aynı vuruşta başlamış bir stagger varsa iptal et; yoksa faz geçişi sürerken
+            // durumu CombatStance'e çekip ikinci bir saldırı başlatıyordu
+            if (staggerRoutine != null)
+            {
+                StopCoroutine(staggerRoutine);
+                staggerRoutine = null;
+            }
 
             SetBlocking(false);
             StartCoroutine(PhaseTransitionRoutine());
@@ -576,6 +674,7 @@ namespace SoulsRPG.Boss
                          ?? FindChildRecursive(transform, "Shield_Equipped");
             if (shield != null)
             {
+                stowedShield = shield.gameObject;
                 shield.gameObject.SetActive(false);
             }
         }
@@ -595,7 +694,7 @@ namespace SoulsRPG.Boss
         // IDAMAGEABLE & COMBAT
         // ==========================================
 
-        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null)
+        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null, float poiseMultiplier = 1f)
         {
             if (isDead || isInvulnerable) return;
 
@@ -629,38 +728,38 @@ namespace SoulsRPG.Boss
                 BossHealthBarHUD.Instance.UpdateBossHealth(currentHealth, maxHealth);
             }
 
-            // Poise calculation
-            currentPoise -= damage;
-            if (currentPoise <= 0f && currentState != BossAIState.PhaseTransition)
+            // 1. Ölüm her şeyden önce kontrol edilir (tek vuruşta %50'nin üstünden 0'a inerse faz 2'ye geçmeden ölür)
+            if (currentHealth <= 0)
             {
-                TriggerStagger();
+                Die();
+                return;
             }
 
-            // Check Phase 2 Trigger (At <= 50% HP)
+            // 2. Faz 2 geçişi (<= %50 HP) — stagger'dan önce, ikisi aynı anda başlamasın
             if (!isPhase2 && currentHealth <= maxHealth * 0.5f)
             {
+                currentPoise = maxPoise;
                 TriggerPhaseTransition();
                 return;
             }
 
-            // Check Death
-            if (currentHealth <= 0)
+            // 3. Poise
+            currentPoise -= damage * poiseMultiplier;
+            if (currentPoise <= 0f && currentState != BossAIState.PhaseTransition && currentState != BossAIState.Staggered)
             {
-                Die();
+                TriggerStagger();
             }
-            else
-            {
-                FlashWhite();
-            }
+
+            FlashWhite();
         }
 
         private void TriggerStagger()
         {
             currentPoise = maxPoise;
-            if (activeAttackRoutine != null) StopCoroutine(activeAttackRoutine);
-            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            StopActiveAttack();
 
-            StartCoroutine(StaggerRoutine());
+            if (staggerRoutine != null) StopCoroutine(staggerRoutine);
+            staggerRoutine = StartCoroutine(StaggerRoutine());
         }
 
         private IEnumerator StaggerRoutine()
@@ -680,8 +779,12 @@ namespace SoulsRPG.Boss
             }
 
             yield return new WaitForSeconds(1.8f);
-            currentState = BossAIState.CombatStance;
-            attackCooldownTimer = 0.8f;
+            if (!isDead && currentState == BossAIState.Staggered)
+            {
+                currentState = BossAIState.CombatStance;
+                attackCooldownTimer = 0.8f;
+            }
+            staggerRoutine = null;
         }
 
         private void Die()
@@ -690,8 +793,15 @@ namespace SoulsRPG.Boss
             isDead = true;
             currentState = BossAIState.Dead;
 
-            if (activeAttackRoutine != null) StopCoroutine(activeAttackRoutine);
-            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            StopActiveAttack();
+            if (staggerRoutine != null)
+            {
+                StopCoroutine(staggerRoutine);
+                staggerRoutine = null;
+            }
+
+            var lockOn = GetComponent<LockOnTarget>();
+            if (lockOn != null) lockOn.SetLockable(false);
 
             SetBlocking(false);
             SetAnimationSpeed(0f);

@@ -7,7 +7,8 @@ namespace SoulsRPG.Combat
     /// </summary>
     public interface IDamageable
     {
-        void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null);
+        /// <param name="poiseMultiplier">Denge (poise) hasarı çarpanı. Ağır saldırılar 1'den büyük değer gönderir.</param>
+        void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null, float poiseMultiplier = 1f);
         bool IsDead { get; }
     }
 }

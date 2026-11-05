@@ -51,8 +51,7 @@ namespace SoulsRPG.Boss
             ringRenderer.endWidth = 0.65f;
 
             // Sprites/Default shader'ı Built-in RP'de her zaman mevcuttur ve vertex rengiyle pürüzsüz parlar
-            var shader = Shader.Find("Sprites/Default");
-            ringMat = new Material(shader);
+            ringMat = new Material(Core.RuntimeShaders.Find(Core.RuntimeShaders.SpritesDefault));
             ringRenderer.material = ringMat;
 
             // 2. Zemini Aydınlatan Alev Işığı

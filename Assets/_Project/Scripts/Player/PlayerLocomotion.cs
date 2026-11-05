@@ -30,6 +30,26 @@ namespace SoulsRPG.Player
         [Header("Combat Actions")]
         [SerializeField] private float attackStaminaCost = 12f;
 
+        [Header("Heavy Attack (R2)")]
+        [SerializeField] private float heavyStaminaMultiplier = 1.6f;
+        [SerializeField] private float heavyDamageMultiplier = 1.8f;
+        [Tooltip("Hedefe verilen poise (denge) hasarı çarpanı — düşmanları daha kolay sendeletir")]
+        [SerializeField] private float heavyPoiseMultiplier = 2.2f;
+        [Tooltip("Gerilme (kılıç geriye çekilirken) süresi çarpanı. Animasyon da bu oranda yavaşlar, böylece ağır vuruşun 'yüklenme' hissi oluşur")]
+        [SerializeField] private float heavyWindupMultiplier = 1.8f;
+        [Tooltip("Savurma (hasar penceresi) süresi çarpanı. 1'in altı = savurma hafif saldırıdan daha sert/hızlı")]
+        [SerializeField] private float heavySwingMultiplier = 0.9f;
+        [Tooltip("Toparlanma süresi çarpanı (vuruştan sonra açık kalma)")]
+        [SerializeField] private float heavyRecoveryMultiplier = 1.6f;
+        [Tooltip("Savurma başında öne atılma mesafesi (metre)")]
+        [SerializeField] private float heavyLungeDistance = 0.9f;
+        [Tooltip("Ağır saldırı isabet edince kamera sarsıntısı şiddeti")]
+        [SerializeField] private float heavyHitShake = 0.18f;
+
+        // Animator'da "isHeavyAttack" trigger'ı varsa ayrı ağır saldırı animasyonu oynatılır
+        private const string HeavyAttackTrigger = "isHeavyAttack";
+        private bool hasHeavyAttackTrigger;
+
         [Header("Mesh & Locomotion Stabilization")]
         [Tooltip("Animasyon kaynaklı root-motion kaymalarını engelleyerek karakter modelini daima CharacterController merkezinde tutar")]
         [SerializeField] private bool stabilizeLocomotionMesh = true;
@@ -63,7 +83,6 @@ namespace SoulsRPG.Player
         public static PlayerLocomotion Instance { get; private set; }
 
         [Header("Weapon & Damage Settings")]
-        [SerializeField] private int attackDamage = 35;
         [Tooltip("Geriye çekilme süresi: Silah omuz arkasına kalkana kadar hasar kapalıdır (Yeşil)")]
         [SerializeField] private float attackWindupTime = 0.48f;
         [Tooltip("Öne savurma süresi: Silah öne doğru savrulurken hasar açıktır (Kırmızı)")]
@@ -72,13 +91,41 @@ namespace SoulsRPG.Player
         [SerializeField] private float attackRecoveryTime = 0.22f;
         private Combat.WeaponDamageCollider weaponCollider;
 
+        // İptal edilebilir eylem coroutine'leri
+        private Coroutine attackRoutine;
+        private Coroutine rollRoutine;
+        private Coroutine staggerRoutine;
+
         public bool IsRolling => isRolling;
         public bool IsSprinting => isSprinting;
         public bool IsBlocking => isBlocking;
         public bool IsGrounded => isGrounded;
         public bool IsStaggered => isStaggered;
+        public bool IsAttacking => isAttacking;
         public bool isResting = false;
         public bool IsResting => isResting;
+
+        private UnityEngine.Camera MainCamera
+        {
+            get
+            {
+                if (mainCamera == null) mainCamera = UnityEngine.Camera.main;
+                return mainCamera;
+            }
+        }
+
+        /// <summary>Kameraya göre yatay giriş vektörü (kamera yoksa karakterin kendi eksenleri kullanılır).</summary>
+        private Vector3 GetCameraRelativeInput(float horizontal, float vertical)
+        {
+            Transform reference = MainCamera != null ? MainCamera.transform : transform;
+            Vector3 camForward = reference.forward;
+            Vector3 camRight = reference.right;
+            camForward.y = 0;
+            camRight.y = 0;
+            camForward.Normalize();
+            camRight.Normalize();
+            return (camForward * vertical + camRight * horizontal).normalized;
+        }
 
         private void Awake()
         {
@@ -129,6 +176,8 @@ namespace SoulsRPG.Player
             {
                 animator = GetComponentInChildren<Animator>();
             }
+
+            RefreshAnimatorParameters();
 
             if (animator != null)
             {
@@ -208,14 +257,7 @@ namespace SoulsRPG.Player
             }
 
             // Calculate movement vector relative to camera
-            Vector3 camForward = mainCamera.transform.forward;
-            Vector3 camRight = mainCamera.transform.right;
-            camForward.y = 0;
-            camRight.y = 0;
-            camForward.Normalize();
-            camRight.Normalize();
-
-            Vector3 inputVector = (camForward * vertical + camRight * horizontal).normalized;
+            Vector3 inputVector = GetCameraRelativeInput(horizontal, vertical);
             lastInputVector = inputVector;
 
             // Handle Sprinting (Cannot sprint while blocking)
@@ -266,10 +308,11 @@ namespace SoulsRPG.Player
 
         private void HandleRotation(Vector3 inputVector)
         {
-            if (CameraManager.Instance != null && CameraManager.Instance.IsLockedOn)
+            var lockTarget = CameraManager.Instance != null ? CameraManager.Instance.CurrentLockedTarget : null;
+            if (lockTarget != null)
             {
                 // Locked-on: Rakibe tam cepheden odaklan
-                Vector3 targetDir = CameraManager.Instance.CurrentLockedTarget.transform.position - transform.position;
+                Vector3 targetDir = lockTarget.transform.position - transform.position;
                 targetDir.y = 0;
                 if (targetDir != Vector3.zero)
                 {
@@ -283,7 +326,7 @@ namespace SoulsRPG.Player
                 if (isBlocking)
                 {
                     // Serbest bakışta blok yapılırken kameranın baktığı yöne tam cepheden dön
-                    Vector3 camFwd = mainCamera != null ? mainCamera.transform.forward : transform.forward;
+                    Vector3 camFwd = MainCamera != null ? MainCamera.transform.forward : transform.forward;
                     camFwd.y = 0;
                     if (camFwd != Vector3.zero)
                     {
@@ -302,37 +345,19 @@ namespace SoulsRPG.Player
 
         public void AttemptDodgeRoll(float horizontal, float vertical)
         {
-            if (playerStats.isDead || isRolling || isStaggered || isAttacking) return;
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isResting) return;
 
-            // Cancel blocking and attack collider when rolling
+            Vector3 inputVector = GetCameraRelativeInput(horizontal, vertical);
+            bool isRoll = inputVector.magnitude > 0.1f;
+
+            // Stamina yoksa (0) yuvarlanma/backstep yapılamaz
+            if (!playerStats.UseStamina(isRoll ? rollStaminaCost : backstepStaminaCost)) return;
+
+            // Cancel blocking when rolling
             SetBlocking(false);
-            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
-            isAttacking = false;
-
-            Vector3 camForward = mainCamera.transform.forward;
-            Vector3 camRight = mainCamera.transform.right;
-            camForward.y = 0;
-            camRight.y = 0;
-            camForward.Normalize();
-            camRight.Normalize();
-
-            Vector3 inputVector = (camForward * vertical + camRight * horizontal).normalized;
             lastInputVector = inputVector;
 
-            if (inputVector.magnitude > 0.1f)
-            {
-                if (playerStats.UseStamina(rollStaminaCost))
-                {
-                    StartCoroutine(PerformRollRoutine(inputVector));
-                }
-            }
-            else
-            {
-                if (playerStats.UseStamina(backstepStaminaCost))
-                {
-                    StartCoroutine(PerformBackstepRoutine());
-                }
-            }
+            rollRoutine = StartCoroutine(isRoll ? PerformRollRoutine(inputVector) : PerformBackstepRoutine());
         }
 
         private IEnumerator PerformRollRoutine(Vector3 direction)
@@ -386,6 +411,7 @@ namespace SoulsRPG.Player
 
             playerStats.isInvulnerable = false;
             isRolling = false;
+            rollRoutine = null;
         }
 
         private IEnumerator PerformBackstepRoutine()
@@ -412,13 +438,16 @@ namespace SoulsRPG.Player
             }
 
             isRolling = false;
+            rollRoutine = null;
         }
 
-        public void AttemptAttack()
+        /// <param name="heavy">true: R2 ağır saldırı (daha yavaş, daha fazla hasar ve stamina)</param>
+        public void AttemptAttack(bool heavy = false)
         {
-            if (playerStats.isDead || isRolling || isAttacking || isStaggered) return;
+            if (playerStats.isDead || isRolling || isAttacking || isStaggered || isResting) return;
 
-            if (playerStats.UseStamina(attackStaminaCost))
+            float cost = heavy ? attackStaminaCost * heavyStaminaMultiplier : attackStaminaCost;
+            if (playerStats.UseStamina(cost))
             {
                 // Saldırıya başlarken: Serbest bakışta hareket yönü varsa o yöne dönerek saldırıya başla
                 if (CameraManager.Instance == null || !CameraManager.Instance.IsLockedOn)
@@ -428,14 +457,85 @@ namespace SoulsRPG.Player
                         transform.rotation = Quaternion.LookRotation(lastInputVector);
                     }
                 }
-                StartCoroutine(PerformAttackRoutine());
+                attackRoutine = StartCoroutine(PerformAttackRoutine(heavy));
             }
         }
 
-        private IEnumerator PerformAttackRoutine()
+        /// <summary>Devam eden saldırıyı keser ve hasar alanını kapatır (stagger, ölüm vb.).</summary>
+        private void CancelAttack()
+        {
+            if (attackRoutine != null)
+            {
+                StopCoroutine(attackRoutine);
+                attackRoutine = null;
+            }
+            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            isAttacking = false;
+            SetAnimatorSpeed(1f);
+        }
+
+        private void SetAnimatorSpeed(float value)
+        {
+            if (animator != null) animator.speed = value;
+        }
+
+        private void RefreshAnimatorParameters()
+        {
+            hasHeavyAttackTrigger = false;
+            if (animator == null || animator.runtimeAnimatorController == null) return;
+            foreach (var p in animator.parameters)
+            {
+                if (p.type == AnimatorControllerParameterType.Trigger && p.name == HeavyAttackTrigger)
+                {
+                    hasHeavyAttackTrigger = true;
+                    break;
+                }
+            }
+        }
+
+        /// <summary>Verilen süre boyunca bekler (her fazın sonunda saldırı iptal edildiyse coroutine zaten durur).</summary>
+        private static IEnumerator WaitPhase(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        private void CancelRoll()
+        {
+            if (rollRoutine != null)
+            {
+                StopCoroutine(rollRoutine);
+                rollRoutine = null;
+            }
+            isRolling = false;
+            if (playerStats != null) playerStats.isInvulnerable = false;
+            if (animator != null) animator.transform.localPosition = Vector3.zero;
+        }
+
+        private IEnumerator PerformAttackRoutine(bool heavy)
         {
             isAttacking = true;
             isSprinting = false;
+
+            // Beceri saldırı hızını artırır. Ağır saldırıda her fazın kendi çarpanı var.
+            // Animator hızı da her fazda aynı oranda değiştirilir; böylece kılıcın ekrandaki hareketi
+            // ile hasar penceresi senkron kalır (animasyon, hafif saldırı süreleriyle hizalı varsayılır).
+            float speed = playerStats != null ? playerStats.AttackSpeedMultiplier : 1f;
+            float windupMul = (heavy ? heavyWindupMultiplier : 1f) / speed;
+            float swingMul = (heavy ? heavySwingMultiplier : 1f) / speed;
+            float recoveryMul = (heavy ? heavyRecoveryMultiplier : 1f) / speed;
+
+            int baseDamage = playerStats != null ? playerStats.AttackDamage : PlayerStats.BaseAttackDamage;
+            int damage = heavy ? Mathf.RoundToInt(baseDamage * heavyDamageMultiplier) : baseDamage;
+            float poiseMul = heavy ? heavyPoiseMultiplier : 1f;
+            float hitShake = heavy ? heavyHitShake : 0f;
+
+            // Ayrı ağır saldırı klibi varsa onu kullan ve zamanlamayı onun kendi hızına bırak
+            bool useHeavyClip = heavy && hasHeavyAttackTrigger;
 
             // Ensure weapon collider reference is ready
             if (weaponCollider == null)
@@ -448,39 +548,72 @@ namespace SoulsRPG.Player
             if (animator != null)
             {
                 animator.SetFloat("Speed", 0f);
-                animator.SetTrigger("isAttacking");
+                animator.SetTrigger(useHeavyClip ? HeavyAttackTrigger : "isAttacking");
             }
 
-            // 1. Wind-up Delay (Silah geriye çekiliyor - ayaklar yerde sabit)
-            float elapsed = 0f;
-            while (elapsed < attackWindupTime)
-            {
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
+            // 1. Wind-up (Silah geriye çekiliyor - ayaklar yerde sabit). Ağır saldırıda animasyon yavaşlar.
+            if (!useHeavyClip) SetAnimatorSpeed(1f / windupMul);
+            yield return WaitPhase(attackWindupTime * windupMul);
 
-            // 2. Active Damage Window (Silah savruluyor, hasar alanı AKTİF! - ayaklar yerde sabit)
-            Audio.SoulsAudioManager.GetOrCreate().PlaySwing(transform.position + transform.forward * 0.8f + Vector3.up * 1.2f);
+            // 2. Active Damage Window (Silah savruluyor, hasar alanı AKTİF!)
+            if (!useHeavyClip) SetAnimatorSpeed(1f / swingMul);
+            Vector3 swingSoundPos = transform.position + transform.forward * 0.8f + Vector3.up * 1.2f;
+            if (heavy) Audio.SoulsAudioManager.GetOrCreate().PlayHeavySwing(swingSoundPos);
+            else Audio.SoulsAudioManager.GetOrCreate().PlaySwing(swingSoundPos);
+
             if (weaponCollider != null)
             {
-                weaponCollider.EnableDamageCollider(attackDamage);
+                weaponCollider.EnableDamageCollider(damage, poiseMul, hitShake);
             }
 
-            elapsed = 0f;
-            while (elapsed < attackActiveTime)
+            float activeDuration = attackActiveTime * swingMul;
+            if (heavy && heavyLungeDistance > 0f)
             {
-                elapsed += Time.deltaTime;
-                yield return null;
+                // Savurmanın ilk kısmında öne atıl (ağırlık hissi + menzil)
+                float lungeTime = Mathf.Min(0.18f, activeDuration);
+                float lungeDistance = GetLungeDistance(heavyLungeDistance);
+                float lungeSpeed = lungeDistance / Mathf.Max(0.01f, lungeTime);
+                float t = 0f;
+                while (t < lungeTime)
+                {
+                    t += Time.deltaTime;
+                    if (characterController != null && characterController.enabled)
+                    {
+                        characterController.Move(transform.forward * (lungeSpeed * Time.deltaTime));
+                    }
+                    yield return null;
+                }
+                yield return WaitPhase(activeDuration - lungeTime);
+            }
+            else
+            {
+                yield return WaitPhase(activeDuration);
             }
 
-            // 3. Recovery (Savurma bitti, hasar alanı KAPALI!)
+            // 3. Recovery (Savurma bitti, hasar alanı KAPALI!) — ağır saldırıda daha uzun açık kalırsın
             if (weaponCollider != null)
             {
                 weaponCollider.DisableDamageCollider();
             }
 
-            yield return new WaitForSeconds(attackRecoveryTime);
+            if (!useHeavyClip) SetAnimatorSpeed(1f / recoveryMul);
+            yield return WaitPhase(attackRecoveryTime * recoveryMul);
+
+            SetAnimatorSpeed(1f);
             isAttacking = false;
+            attackRoutine = null;
+        }
+
+        /// <summary>Kilitli hedef çok yakındaysa içine girmemek için atılma mesafesini kısaltır.</summary>
+        private float GetLungeDistance(float desired)
+        {
+            var lockTarget = CameraManager.Instance != null ? CameraManager.Instance.CurrentLockedTarget : null;
+            if (lockTarget == null) return desired;
+
+            Vector3 toTarget = lockTarget.transform.position - transform.position;
+            toTarget.y = 0f;
+            const float minGap = 1.1f;
+            return Mathf.Clamp(toTarget.magnitude - minGap, 0f, desired);
         }
 
         public void SetBlocking(bool blocking)
@@ -513,11 +646,6 @@ namespace SoulsRPG.Player
             }
         }
 
-        public void UpdateAttackDamage(int newDamage)
-        {
-            attackDamage = newDamage;
-        }
-
         public void TriggerBlockRecoil()
         {
             if (isRolling || playerStats.isDead) return;
@@ -542,30 +670,97 @@ namespace SoulsRPG.Player
         public void TriggerGuardBreak(float duration = 1.3f)
         {
             if (playerStats.isDead || isRolling) return;
-            StartCoroutine(GuardBreakRoutine(duration));
+            StartStagger(duration, -transform.forward, 3.5f);
         }
 
-        private IEnumerator GuardBreakRoutine(float duration)
+        /// <summary>Poise kırılınca oyuncu sendeler: saldırı iptal olur, kısa süre kontrol kaybedilir.</summary>
+        public void TriggerHitStagger(float duration, Vector3 pushDirection)
+        {
+            if (playerStats.isDead || isRolling) return;
+            pushDirection.y = 0f;
+            if (pushDirection.sqrMagnitude < 0.001f) pushDirection = -transform.forward;
+            StartStagger(duration, pushDirection.normalized, 2.5f);
+        }
+
+        private void StartStagger(float duration, Vector3 pushDirection, float pushSpeed)
+        {
+            // Saldırı coroutine'i de durdurulur; aksi halde hasar alanı stagger sırasında açılırdı
+            CancelAttack();
+            SetBlockingForced(false);
+
+            if (staggerRoutine != null) StopCoroutine(staggerRoutine);
+            staggerRoutine = StartCoroutine(StaggerRoutine(duration, pushDirection, pushSpeed));
+        }
+
+        private IEnumerator StaggerRoutine(float duration, Vector3 pushDirection, float pushSpeed)
         {
             isStaggered = true;
-            isAttacking = false;
-            SetBlocking(false);
-            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+            isSprinting = false;
+            if (animator != null) animator.SetFloat("Speed", 0f);
 
-            Vector3 pushBack = -transform.forward;
+            float pushTime = Mathf.Min(0.25f, duration);
             float elapsed = 0f;
-            while (elapsed < 0.25f)
+            while (elapsed < pushTime)
             {
                 elapsed += Time.deltaTime;
                 if (characterController != null && characterController.enabled)
                 {
-                    characterController.Move(pushBack * (3.5f * Time.deltaTime));
+                    characterController.Move(pushDirection * (pushSpeed * Time.deltaTime));
                 }
                 yield return null;
             }
 
-            yield return new WaitForSeconds(duration - 0.25f);
+            if (duration > pushTime)
+            {
+                yield return new WaitForSeconds(duration - pushTime);
+            }
             isStaggered = false;
+            staggerRoutine = null;
+        }
+
+        /// <summary>Durum kontrollerine takılmadan bloğu kapatır.</summary>
+        private void SetBlockingForced(bool blocking)
+        {
+            isBlocking = blocking;
+            if (animator != null) animator.SetBool("isBlocking", blocking);
+        }
+
+        // ==========================================
+        // ÖLÜM & YENİDEN DOĞMA
+        // ==========================================
+
+        /// <summary>PlayerStats ölümü bildirince tüm eylemleri durdurur.</summary>
+        public void OnPlayerDied()
+        {
+            CancelAttack();
+            CancelRoll();
+            if (staggerRoutine != null)
+            {
+                StopCoroutine(staggerRoutine);
+                staggerRoutine = null;
+            }
+            isStaggered = false;
+            isSprinting = false;
+            SetBlockingForced(false);
+            if (animator != null) animator.SetFloat("Speed", 0f);
+        }
+
+        /// <summary>Tüm durumu sıfırlar (yeniden doğmada).</summary>
+        public void ResetState()
+        {
+            OnPlayerDied();
+            isResting = false;
+            verticalVelocity = -2f;
+            lastInputVector = Vector3.zero;
+        }
+
+        /// <summary>CharacterController'ı geçici kapatıp oyuncuyu verilen noktaya ışınlar.</summary>
+        public void TeleportTo(Vector3 position, Quaternion rotation)
+        {
+            if (characterController != null) characterController.enabled = false;
+            transform.SetPositionAndRotation(position, rotation);
+            if (characterController != null) characterController.enabled = true;
+            verticalVelocity = -2f;
         }
 
         private void CheckGrounded()

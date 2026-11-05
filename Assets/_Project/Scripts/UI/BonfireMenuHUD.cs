@@ -114,7 +114,7 @@ namespace SoulsRPG.UI
                 var esGo = new GameObject("--- EVENT SYSTEM ---");
                 es = esGo.AddComponent<EventSystem>();
                 esGo.AddComponent<StandaloneInputModule>();
-                Debug.Log("<color=green><b>[BonfireMenu] UI EventSystem (Tıklama ve Giriş Sistemi) oluşturuldu!</b></color>");
+                Core.GameLog.Info("[BonfireMenu] UI EventSystem oluşturuldu");
             }
             else
             {
@@ -150,11 +150,7 @@ namespace SoulsRPG.UI
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            // Rest ses efekti çal
-            if (SoulsAudioManager.Instance != null && activeBonfire != null)
-            {
-                SoulsAudioManager.Instance.PlayBonfireRest(activeBonfire.transform.position);
-            }
+            // Not: dinlenme sesi PlayerStats.RestAtBonfire içinde çalınıyor (burada tekrar çalınca ses iki kez duyuluyordu)
         }
 
         public void CloseMenu()
@@ -500,7 +496,8 @@ namespace SoulsRPG.UI
 
             int previewMaxHp = 100 + (prevVig - 10) * 15 + (previewLevel - 1) * 2;
             float previewMaxStam = 120f + (prevEnd - 10) * 5f;
-            int previewDmg = 25 + (prevStr - 10) * 2;
+            int prevDex = stats.Dexterity + pendingDex;
+            int previewDmg = PlayerStats.BaseAttackDamage + PlayerStats.CalculateBonusDamage(prevStr, prevDex);
             int previewDef = (prevVit - 10) + previewLevel;
             float previewPoise = 50f + (prevVit - 10) * 4f;
 
@@ -509,7 +506,7 @@ namespace SoulsRPG.UI
             if (previewStamText != null)
                 previewStamText.text = $"Dayanıklılık: {stats.MaxStamina}  ➔  <color=green><b>{previewMaxStam}</b></color>";
             if (previewDmgText != null)
-                previewDmgText.text = $"Saldırı Gücü: {25 + stats.BonusAttackDamage}  ➔  <color=green><b>{previewDmg}</b></color>";
+                previewDmgText.text = $"Saldırı Gücü: {stats.AttackDamage}  ➔  <color=green><b>{previewDmg}</b></color>";
             if (previewDefText != null)
                 previewDefText.text = $"Savunma (Oto): {stats.PhysicalDefense}  ➔  <color=green><b>{previewDef}</b></color>";
             if (previewPoiseText != null)
@@ -652,7 +649,7 @@ namespace SoulsRPG.UI
                 if (PlayerStats.Instance != null && activeBonfire != null)
                 {
                     PlayerStats.Instance.RestAtBonfire(activeBonfire.transform.position);
-                    Debug.Log("<color=green>[Bonfire] Oyun kaydedildi, can ve stamina dolduruldu!</color>");
+                    Core.GameLog.Info("[Bonfire] Oyun kaydedildi, can ve stamina dolduruldu");
                     if (feedbackText != null) feedbackText.text = "<color=green>Oyun Kaydedildi!</color>";
                 }
             }, 1);

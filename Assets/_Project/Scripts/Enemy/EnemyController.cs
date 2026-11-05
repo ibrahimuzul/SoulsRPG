@@ -57,7 +57,9 @@ namespace SoulsRPG.Enemy
         [SerializeField] private float blockMaxDuration = 2.4f;
 
         [Header("Respawn")]
-        [SerializeField] private bool autoRespawn = true;
+        [Tooltip("Souls kuralı: düşmanlar bonfire'da dinlenince veya oyuncu ölünce yeniden doğar. " +
+                 "Bunu açarsan ayrıca ölümden 'respawnDelay' saniye sonra da kendiliğinden doğar (test için).")]
+        [SerializeField] private bool respawnOnTimer = false;
         [SerializeField] private float respawnDelay = 5.0f;
 
         // Current State
@@ -151,10 +153,12 @@ namespace SoulsRPG.Enemy
             }
 #endif
 
-            // If NavMeshAgent is attached, configure it smoothly
+            // NavMeshAgent varsa sadece yol bulmak için kullanılır; hareketi CharacterController yapar.
+            // (İkisi birden transform'u hareket ettirirse karakter titrer / kayar.)
             if (navAgent != null)
             {
                 navAgent.updateRotation = false; // We handle smooth rotation
+                navAgent.updatePosition = false;
                 navAgent.stoppingDistance = attackRange * 0.85f;
             }
 
@@ -199,6 +203,25 @@ namespace SoulsRPG.Enemy
             }
 
             FindPlayerTarget();
+        }
+
+        private void OnEnable()
+        {
+            Core.WorldEvents.OnWorldReset += ResetToSpawn;
+        }
+
+        private void OnDisable()
+        {
+            Core.WorldEvents.OnWorldReset -= ResetToSpawn;
+        }
+
+        private void LateUpdate()
+        {
+            // Ajanın iç konumunu gerçek (CharacterController) konumla eşitle
+            if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh)
+            {
+                navAgent.nextPosition = transform.position;
+            }
         }
 
         private void Update()
@@ -417,11 +440,16 @@ namespace SoulsRPG.Enemy
             direction.Normalize();
             FaceDirection(direction);
 
-            if (navAgent != null && navAgent.isOnNavMesh)
+            if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh)
             {
                 navAgent.speed = speed;
                 navAgent.SetDestination(destination);
-                SetAnimSpeed(animSpeedFraction);
+
+                // Ajanın önerdiği yönde CharacterController ile yürü (yol henüz hesaplanmadıysa düz git)
+                Vector3 desired = navAgent.desiredVelocity;
+                desired.y = 0f;
+                Vector3 moveDir = desired.sqrMagnitude > 0.01f ? desired.normalized : direction;
+                MoveDirect(moveDir * speed, animSpeedFraction);
             }
             else
             {
@@ -511,11 +539,10 @@ namespace SoulsRPG.Enemy
             SetBlocking(false);
             SetAnimSpeed(0f); // Dark Souls kuralı: Saldırı anında yürüme/koşma hızı sıfırlanır
 
-            if (navAgent != null && navAgent.isOnNavMesh)
+            if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh)
             {
                 navAgent.ResetPath();
                 navAgent.velocity = Vector3.zero;
-                navAgent.isStopped = true;
             }
 
             // Face player directly before swing (Saldırı başlangıcında hedefe dön, sonra savurma boyunca sabit kal)
@@ -564,17 +591,12 @@ namespace SoulsRPG.Enemy
 
             yield return new WaitForSeconds(attackRecovery);
 
-            if (navAgent != null && navAgent.isOnNavMesh)
-            {
-                navAgent.isStopped = false;
-            }
-
             attackCooldownTimer = attackCooldown;
             currentState = EnemyAIState.CombatStance;
             attackRoutine = null;
         }
 
-        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null)
+        public void TakeDamage(int damage, Vector3 hitPoint, Vector3 hitDirection, Transform attacker = null, float poiseMultiplier = 1f)
         {
             if (isDead) return;
 
@@ -622,7 +644,7 @@ namespace SoulsRPG.Enemy
             recoilRoutine = StartCoroutine(HitRecoilRoutine(hitDirection));
 
             // Poise & Stagger check
-            currentPoise -= 15f;
+            currentPoise -= 15f * poiseMultiplier;
             if (currentPoise <= 0f)
             {
                 currentPoise = poise;
@@ -715,6 +737,8 @@ namespace SoulsRPG.Enemy
 
             var pEmission = ps.emission;
             pEmission.SetBursts(new ParticleSystem.Burst[] { new ParticleSystem.Burst(0f, 15) });
+
+            Core.RuntimeShaders.ApplyParticleMaterial(ps, Color.white);
         }
 
         private void SpawnFloatingDamageNumber(int damage, Vector3 hitPoint)
@@ -752,12 +776,12 @@ namespace SoulsRPG.Enemy
             {
                 PlayerStats.Instance.AddSouls(soulsReward);
             }
-            Debug.Log($"<color=yellow>{enemyName} yenildi! +{soulsReward} Ruh kazanıldı.</color>");
+            Core.GameLog.Info($"{enemyName} yenildi! +{soulsReward} Ruh kazanıldı.");
 
-            StartCoroutine(DeathAndRespawnRoutine());
+            StartCoroutine(DeathRoutine());
         }
 
-        private IEnumerator DeathAndRespawnRoutine()
+        private IEnumerator DeathRoutine()
         {
             // Yere devrilme efekti
             Quaternion startRot = transform.rotation;
@@ -770,20 +794,46 @@ namespace SoulsRPG.Enemy
                 yield return null;
             }
 
-            if (!autoRespawn) yield break;
+            if (!respawnOnTimer) yield break;
 
             yield return new WaitForSeconds(respawnDelay);
+            ResetToSpawn();
+        }
 
-            // Yeniden Doğuş (Respawn)
+        /// <summary>
+        /// Düşmanı başlangıç noktasına, tam cana ve sakin duruma döndürür.
+        /// Bonfire'da dinlenince ve oyuncu yeniden doğunca (WorldEvents) çağrılır.
+        /// </summary>
+        public void ResetToSpawn()
+        {
+            StopAllCoroutines();
+            attackRoutine = null;
+            recoilRoutine = null;
+            if (weaponCollider != null) weaponCollider.DisableDamageCollider();
+
             currentHealth = maxHealth;
             currentPoise = poise;
-            transform.position = spawnPosition;
-            transform.rotation = spawnRotation;
             isDead = false;
             currentState = EnemyAIState.Idle;
+            attackCooldownTimer = 0f;
+            loseAggroTimer = 0f;
+            blockTimer = 0f;
+            verticalVelocity = 0f;
+            healthBarTimer = 0f;
+            displayedHealthFraction = 1f;
+            trailingYellowFraction = 1f;
+            SetBlocking(false);
+            SetAnimSpeed(0f);
 
+            if (characterController != null) characterController.enabled = false;
+            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
             if (characterController != null) characterController.enabled = true;
-            if (navAgent != null) navAgent.enabled = true;
+
+            if (navAgent != null)
+            {
+                navAgent.enabled = true;
+                if (navAgent.isOnNavMesh) navAgent.Warp(spawnPosition);
+            }
             if (lockOnTarget != null) lockOnTarget.SetLockable(true);
 
             // Renkleri sıfırla

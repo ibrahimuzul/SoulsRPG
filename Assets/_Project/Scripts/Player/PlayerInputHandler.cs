@@ -27,7 +27,8 @@ namespace SoulsRPG.Player
         public float rollSprintThreshold = 0.20f;
 
         [Header("Ekran Göstergesi")]
-        public bool showHUD = true;
+        [Tooltip("DualSense eksen debug paneli (F1 ile aç/kapat). F2: vuruş/temas görselleri, F3: ayrıntılı loglar")]
+        public bool showDebugPanel = false;
 
         private PlayerLocomotion locomotion;
         private PlayerStats stats;
@@ -74,7 +75,19 @@ namespace SoulsRPG.Player
             // F1 ile bilgi panelini gizle / aç
             if (Input.GetKeyDown(KeyCode.F1))
             {
-                showHUD = !showHUD;
+                showDebugPanel = !showDebugPanel;
+            }
+
+            // F2 ile vuruş kutusu / temas noktası görsellerini aç / kapat
+            if (Input.GetKeyDown(KeyCode.F2))
+            {
+                Combat.CombatDebugVisualizer.Enabled = !Combat.CombatDebugVisualizer.Enabled;
+            }
+
+            // F3 ile ayrıntılı (bilgi) loglarını aç / kapat
+            if (Input.GetKeyDown(KeyCode.F3))
+            {
+                Core.GameLog.Verbose = !Core.GameLog.Verbose;
             }
 
             // F5 ile Kamera yukarı/aşağı ters çevir (Invert Y)
@@ -248,26 +261,27 @@ namespace SoulsRPG.Player
             locomotion.SetBlocking(isBlocking);
             statusBlock = isBlocking ? "<color=lime>🛡️ BLOK AKTİF</color>" : "<color=grey>PASİF</color>";
 
-            // Saldırı: R1 (Button 5) / R2 (Button 7) / Sol Tık
+            // Hafif Saldırı: R1 (Button 5) / Sol Tık — Ağır Saldırı: R2 (Button 7) / F
             bool r1 = Input.GetKeyDown(KeyCode.JoystickButton5);
-            bool r2 = Input.GetKeyDown(KeyCode.JoystickButton7);
+            bool r2 = Input.GetKeyDown(KeyCode.JoystickButton7) || Input.GetKeyDown(KeyCode.F);
             bool mouseLeft = Input.GetMouseButtonDown(0);
 
-            if (r1 || mouseLeft)
+            if (r2)
             {
-                locomotion.AttemptAttack();
-                statusAttack = "<color=yellow>⚔️ HAFİF (R1)</color>";
-            }
-            else if (r2)
-            {
-                locomotion.AttemptAttack();
+                locomotion.AttemptAttack(true);
                 statusAttack = "<color=orange>💥 AĞIR (R2)</color>";
             }
+            else if (r1 || mouseLeft)
+            {
+                locomotion.AttemptAttack(false);
+                statusAttack = "<color=yellow>⚔️ HAFİF (R1)</color>";
+            }
 
-            // Hedef Kilidi: R3 (Button 11 / 9) / Q / Orta Tık
+            // Hedef Kilidi: R3 (Button 11 / 9) / Tab / Orta Tık
+            // (Q artık sadece blok içindir; önceden hem blok hem kilit tuşuydu)
             bool r3 = Input.GetKeyDown(KeyCode.JoystickButton11) ||
                       Input.GetKeyDown(KeyCode.JoystickButton9) ||
-                      Input.GetKeyDown(KeyCode.Q) ||
+                      Input.GetKeyDown(KeyCode.Tab) ||
                       Input.GetMouseButtonDown(2);
 
             if (r3 && cameraManager != null)
@@ -286,7 +300,7 @@ namespace SoulsRPG.Player
 
         private void OnGUI()
         {
-            if (!showHUD) return;
+            if (!showDebugPanel) return;
 
             int w = 480;
             int h = 230;

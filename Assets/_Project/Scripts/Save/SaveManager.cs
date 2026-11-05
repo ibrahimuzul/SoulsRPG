@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEngine;
+using SoulsRPG.Core;
 using SoulsRPG.Player;
 
 namespace SoulsRPG.Save
@@ -23,6 +24,13 @@ namespace SoulsRPG.Save
         public float respawnY = 0f;
         public float respawnZ = -14f;
         public bool hasSavedBonfire = false;
+
+        // Ruh Lekesi (Bloodstain): ölünce düşen ruhlar
+        public bool hasBloodstain = false;
+        public int bloodstainSouls = 0;
+        public float bloodstainX = 0f;
+        public float bloodstainY = 0f;
+        public float bloodstainZ = 0f;
 
         public string saveTimestamp = "";
     }
@@ -72,10 +80,19 @@ namespace SoulsRPG.Save
                     data.hasSavedBonfire = true;
                 }
 
+                if (stats.BloodstainPosition.HasValue && stats.BloodstainSouls > 0)
+                {
+                    data.hasBloodstain = true;
+                    data.bloodstainSouls = stats.BloodstainSouls;
+                    data.bloodstainX = stats.BloodstainPosition.Value.x;
+                    data.bloodstainY = stats.BloodstainPosition.Value.y;
+                    data.bloodstainZ = stats.BloodstainPosition.Value.z;
+                }
+
                 string json = JsonUtility.ToJson(data, true);
                 File.WriteAllText(SaveFilePath, json);
 
-                Debug.Log($"<color=green><b>[SaveManager] Karakter Kaydedildi! (Level: {data.soulLevel}, Ruh: {data.currentSouls}, Dosya: {SaveFilePath})</b></color>");
+                GameLog.Info($"[SaveManager] Kaydedildi (Level: {data.soulLevel}, Ruh: {data.currentSouls}, Dosya: {SaveFilePath})");
             }
             catch (Exception ex)
             {
@@ -94,7 +111,7 @@ namespace SoulsRPG.Save
             {
                 string json = File.ReadAllText(SaveFilePath);
                 var data = JsonUtility.FromJson<PlayerSaveData>(json);
-                Debug.Log($"<color=cyan><b>[SaveManager] Kayıt Yüklendi! (Level: {data.soulLevel}, Ruh: {data.currentSouls})</b></color>");
+                GameLog.Info($"[SaveManager] Kayıt yüklendi (Level: {data.soulLevel}, Ruh: {data.currentSouls})");
                 return data;
             }
             catch (Exception ex)
@@ -109,7 +126,7 @@ namespace SoulsRPG.Save
             if (HasSaveFile())
             {
                 File.Delete(SaveFilePath);
-                Debug.Log("<color=yellow>[SaveManager] Kayıt dosyası silindi!</color>");
+                GameLog.Info("[SaveManager] Kayıt dosyası silindi");
             }
         }
     }

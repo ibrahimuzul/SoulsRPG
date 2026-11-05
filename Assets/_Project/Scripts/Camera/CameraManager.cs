@@ -250,5 +250,16 @@ namespace SoulsRPG.CameraSystem
         {
             target = newTarget;
         }
+
+        /// <summary>Kilidi bırakır ve kamerayı anında hedefin arkasına alır (yeniden doğmada).</summary>
+        public void SnapBehindTarget()
+        {
+            ClearLockOn();
+            if (target == null) return;
+            yaw = target.eulerAngles.y;
+            pitch = 15f;
+            currentDistance = defaultDistance;
+            shakeTimer = 0f;
+        }
     }
 }

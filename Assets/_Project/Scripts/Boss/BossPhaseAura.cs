@@ -56,8 +56,7 @@ namespace SoulsRPG.Boss
                 weaponTrail.startWidth = 0.35f;
                 weaponTrail.endWidth = 0.05f;
 
-                var shader = Shader.Find("Particles/Standard Unlit") ?? Shader.Find("Mobile/Particles/Additive") ?? Shader.Find("Standard");
-                var trailMat = new Material(shader);
+                var trailMat = new Material(Core.RuntimeShaders.Find(Core.RuntimeShaders.ParticlesUnlit, Core.RuntimeShaders.SpritesDefault));
                 trailMat.color = new Color(1.0f, 0.3f, 0.05f, 0.8f);
                 if (trailMat.HasProperty("_EmissionColor"))
                 {
@@ -75,6 +74,33 @@ namespace SoulsRPG.Boss
                 auraLight.color = new Color(1.0f, 0.4f, 0.1f);
                 auraLight.range = 6.0f;
                 auraLight.intensity = 2.0f;
+            }
+        }
+
+        /// <summary>Faz 2 görsellerini kaldırır (boss sıfırlanınca).</summary>
+        public void DeactivateAura()
+        {
+            if (!isAuraActive) return;
+            isAuraActive = false;
+
+            foreach (var mat in modifiedMaterials)
+            {
+                if (mat == null) continue;
+                mat.SetColor("_EmissionColor", Color.black);
+                mat.DisableKeyword("_EMISSION");
+            }
+            modifiedMaterials.Clear();
+
+            if (weaponTrail != null)
+            {
+                if (weaponTrail.material != null) Destroy(weaponTrail.material);
+                Destroy(weaponTrail);
+                weaponTrail = null;
+            }
+            if (auraLight != null)
+            {
+                Destroy(auraLight.gameObject);
+                auraLight = null;
             }
         }
 

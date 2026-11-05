@@ -95,6 +95,12 @@ namespace SoulsRPG.Audio
             PlayRandomClip(swingClips, position, swingVolume * masterVolume, 0.93f, 1.07f);
         }
 
+        /// <summary>Ağır saldırı savurması: aynı klipler, daha pes ve daha yüksek sesle.</summary>
+        public void PlayHeavySwing(Vector3 position)
+        {
+            PlayRandomClip(swingClips, position, Mathf.Min(1f, swingVolume * masterVolume * 1.3f), 0.74f, 0.84f);
+        }
+
         public void PlayHit(Vector3 position)
         {
             PlayRandomClip(hitClips, position, hitVolume * masterVolume, 0.90f, 1.10f);
