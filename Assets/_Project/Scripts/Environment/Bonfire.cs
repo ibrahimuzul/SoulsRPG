@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using SoulsRPG.Player;
@@ -14,16 +15,98 @@ namespace SoulsRPG.Environment
     /// </summary>
     public class Bonfire : MonoBehaviour
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureBonfireInScene()
+        /// <summary>Oyunun bonfire listesi. Sahnede aynı kimlikte (veya 3 m yakınında) bir bonfire yoksa oyun başında otomatik oluşturulur.</summary>
+        public struct BonfireDefinition
         {
-            if (FindAnyObjectByType<Bonfire>() != null) return;
-            var go = new GameObject("Bonfire_Main");
-            go.transform.position = new Vector3(0f, 0.09f, -10f);
-            go.AddComponent<Bonfire>();
+            public string Id;
+            public string Name;
+            public Vector3 Position;
+            /// <summary>Bonfire'ın baktığı yön (derece). Oyuncu ateşin arkasında, bu yöne bakarak doğar.</summary>
+            public float Yaw;
+
+            public BonfireDefinition(string id, string name, Vector3 position, float yaw)
+            {
+                Id = id; Name = name; Position = position; Yaw = yaw;
+            }
+        }
+
+        public static readonly BonfireDefinition[] DefaultBonfires =
+        {
+            // Başlangıç: kale avlusunun güneyi, oyuncu kuzeye (arenaya) bakarak doğar
+            new BonfireDefinition("kale_avlusu_atesi", "Kale Avlusu Ateşi", new Vector3(0f, 0.09f, -10f), 0f),
+            // Boss bölgesine yakın ama boss'un (22 m) ve Kara Şövalye'nin (12 m) algı menzili dışında; oyuncu batıya, boss'a bakarak doğar
+            new BonfireDefinition("muhafiz_kapisi_atesi", "Muhafız Kapısı Ateşi", new Vector3(-4f, 0.09f, 20f), -90f),
+        };
+
+        private static readonly List<Bonfire> all = new List<Bonfire>();
+        public static IReadOnlyList<Bonfire> All => all;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ClearStatics()
+        {
+            all.Clear();
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureBonfiresInScene()
+        {
+            foreach (var def in DefaultBonfires)
+            {
+                if (ExistsFor(def)) continue;
+                Create(def);
+            }
+        }
+
+        /// <summary>Sahnede bu tanıma karşılık gelen bir bonfire var mı (aynı id veya 3 m yakınında)?</summary>
+        public static bool ExistsFor(BonfireDefinition def)
+        {
+            foreach (var b in FindObjectsByType<Bonfire>())
+            {
+                if (b.Id == def.Id) return true;
+                if ((b.transform.position - def.Position).sqrMagnitude < 9f) return true;
+            }
+            return false;
+        }
+
+        public static Bonfire Create(BonfireDefinition def)
+        {
+            var go = new GameObject("Bonfire_" + def.Id);
+            go.transform.SetPositionAndRotation(def.Position, Quaternion.Euler(0f, def.Yaw, 0f));
+            var bonfire = go.AddComponent<Bonfire>();
+            bonfire.Initialize(def.Id, def.Name);
+            return bonfire;
+        }
+
+        public static Bonfire FindById(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (var b in all)
+            {
+                if (b != null && b.Id == id) return b;
+            }
+            return null;
+        }
+
+        public static Bonfire FindNearest(Vector3 position)
+        {
+            Bonfire best = null;
+            float bestDist = float.MaxValue;
+            foreach (var b in all)
+            {
+                if (b == null) continue;
+                float d = (b.transform.position - position).sqrMagnitude;
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    best = b;
+                }
+            }
+            return best;
         }
 
         [Header("Bonfire Settings")]
+        [Tooltip("Benzersiz kimlik (kayıtta bu tutulur). Boş bırakılırsa addan üretilir.")]
+        [SerializeField] private string bonfireId = "";
         [SerializeField] private string bonfireName = "Kale Avlusu Ateşi";
         [SerializeField] private float interactionRadius = 2.8f;
         [SerializeField] private Color fireColor = new Color(1.0f, 0.55f, 0.15f);
@@ -40,6 +123,61 @@ namespace SoulsRPG.Environment
 
         private GameObject promptUI;
         private Text promptText;
+
+        /// <summary>Kayıtta tutulan benzersiz kimlik.</summary>
+        public string Id => string.IsNullOrEmpty(bonfireId) ? Slugify(bonfireName) : bonfireId;
+        public string DisplayName => bonfireName;
+
+        public void Initialize(string id, string displayName)
+        {
+            bonfireId = id;
+            bonfireName = displayName;
+        }
+
+        /// <summary>Oyuncunun bu bonfire'da doğacağı yatay konum ve yön: ateşin arkasında, ateşin baktığı yöne dönük.</summary>
+        public void GetSpawnPose(float distance, out Vector3 position, out Quaternion rotation)
+        {
+            Vector3 forward = transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
+            forward.Normalize();
+
+            position = transform.position - forward * distance;
+            rotation = Quaternion.LookRotation(forward);
+        }
+
+        private static string Slugify(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "bonfire";
+            var sb = new System.Text.StringBuilder(text.Length);
+            foreach (char raw in text.ToLowerInvariant())
+            {
+                char c = raw;
+                switch (c)
+                {
+                    case 'ş': c = 's'; break;
+                    case 'ğ': c = 'g'; break;
+                    case 'ı': c = 'i'; break;
+                    case 'i': c = 'i'; break;
+                    case 'ö': c = 'o'; break;
+                    case 'ü': c = 'u'; break;
+                    case 'ç': c = 'c'; break;
+                }
+                if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) sb.Append(c);
+                else if (sb.Length > 0 && sb[sb.Length - 1] != '_') sb.Append('_');
+            }
+            return sb.ToString().Trim('_');
+        }
+
+        private void OnEnable()
+        {
+            if (!all.Contains(this)) all.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            all.Remove(this);
+        }
 
         private void Start()
         {
@@ -217,7 +355,7 @@ namespace SoulsRPG.Environment
             // 2. Canı ve dayanıklılığı doldur, oyunu kaydet
             if (playerStats != null)
             {
-                playerStats.RestAtBonfire(transform.position);
+                playerStats.RestAtBonfire(Id, bonfireName, transform.position);
             }
 
             // 3. Bonfire Menüsünü Aç

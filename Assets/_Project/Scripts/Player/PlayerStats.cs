@@ -87,6 +87,8 @@ namespace SoulsRPG.Player
         public float AttackSpeedMultiplier => CalculateAttackSpeed(dexterity);
 
         public Vector3? LastBonfirePosition { get; private set; }
+        public string LastBonfireId { get; private set; }
+        public string LastBonfireName { get; private set; }
 
         // Ruh lekesi (Bloodstain): ölünce kaybedilen ruhlar
         public Vector3? BloodstainPosition { get; private set; }
@@ -245,12 +247,16 @@ namespace SoulsRPG.Player
         /// <summary>
         /// Bonfire'a oturulduğunda can ve dayanıklılığı tamamen doldurur, dünyayı sıfırlar ve oyunu kaydeder.
         /// </summary>
-        public void RestAtBonfire(Vector3 bonfirePosition)
+        /// <param name="bonfireId">Bonfire'ın benzersiz kimliği (doğma noktası bununla bulunur)</param>
+        /// <param name="bonfireName">Ekranda/kayıtta görünen adı</param>
+        public void RestAtBonfire(string bonfireId, string bonfireName, Vector3 bonfirePosition)
         {
             currentHealth = maxHealth;
             currentStamina = maxStamina;
             currentPoise = maxPoise;
             LastBonfirePosition = bonfirePosition;
+            LastBonfireId = bonfireId;
+            LastBonfireName = bonfireName;
 
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
             OnStaminaChanged?.Invoke(currentStamina, maxStamina);
@@ -328,6 +334,8 @@ namespace SoulsRPG.Player
                 if (data.hasSavedBonfire)
                 {
                     LastBonfirePosition = new Vector3(data.respawnX, data.respawnY, data.respawnZ);
+                    LastBonfireId = data.lastBonfireId;
+                    LastBonfireName = data.lastBonfireName;
                 }
 
                 if (data.hasBloodstain && data.bloodstainSouls > 0)

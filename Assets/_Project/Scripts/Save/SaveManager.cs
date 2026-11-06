@@ -25,6 +25,10 @@ namespace SoulsRPG.Save
         public float respawnZ = -14f;
         public bool hasSavedBonfire = false;
 
+        // Son dinlenilen bonfire'ın kimliği ve adı (doğma noktası bu id ile bulunur; konum yedek olarak kalır)
+        public string lastBonfireId = "";
+        public string lastBonfireName = "";
+
         // Ruh Lekesi (Bloodstain): ölünce düşen ruhlar
         public bool hasBloodstain = false;
         public int bloodstainSouls = 0;
@@ -80,6 +84,12 @@ namespace SoulsRPG.Save
                     data.hasSavedBonfire = true;
                 }
 
+                if (data.hasSavedBonfire)
+                {
+                    data.lastBonfireId = stats.LastBonfireId ?? "";
+                    data.lastBonfireName = stats.LastBonfireName ?? "";
+                }
+
                 if (stats.BloodstainPosition.HasValue && stats.BloodstainSouls > 0)
                 {
                     data.hasBloodstain = true;
@@ -92,7 +102,7 @@ namespace SoulsRPG.Save
                 string json = JsonUtility.ToJson(data, true);
                 File.WriteAllText(SaveFilePath, json);
 
-                GameLog.Info($"[SaveManager] Kaydedildi (Level: {data.soulLevel}, Ruh: {data.currentSouls}, Dosya: {SaveFilePath})");
+                GameLog.Info($"[SaveManager] Kaydedildi (Level: {data.soulLevel}, Ruh: {data.currentSouls}, Bonfire: {(data.hasSavedBonfire ? data.lastBonfireName : "yok")}, Dosya: {SaveFilePath})");
             }
             catch (Exception ex)
             {

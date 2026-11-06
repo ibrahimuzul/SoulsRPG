@@ -45,7 +45,17 @@ namespace SoulsRPG.Player
             locomotion = GetComponent<PlayerLocomotion>();
             initialSpawnPosition = transform.position;
             initialSpawnRotation = transform.rotation;
+
+            // Karakter pivotunun ayak tabanına göre yüksekliği (CharacterController kapsülünden)
+            var cc = GetComponent<CharacterController>();
+            if (cc != null)
+            {
+                float scaleY = transform.lossyScale.y;
+                pivotHeightAboveFeet = Mathf.Max(0f, -(cc.center.y - cc.height * 0.5f) * scaleY) + cc.skinWidth;
+            }
         }
+
+        private float pivotHeightAboveFeet;
 
         private void OnEnable()
         {
@@ -61,6 +71,9 @@ namespace SoulsRPG.Player
         private void Start()
         {
             BuildUI();
+
+            // Oyuna girişte son kaydedilen bonfire'da başla
+            SpawnAtSavedBonfire();
 
             // Önceki oturumdan kalan ruh lekesini geri getir
             if (stats.BloodstainPosition.HasValue && stats.BloodstainSouls > 0)
@@ -128,6 +141,26 @@ namespace SoulsRPG.Player
             isHandlingDeath = false;
         }
 
+        /// <summary>
+        /// Oyun açılınca karakteri son kaydedilen bonfire'a koyar (kayıt yoksa sahnedeki başlangıç noktasında kalır).
+        /// </summary>
+        private void SpawnAtSavedBonfire()
+        {
+            if (!stats.LastBonfirePosition.HasValue) return;
+
+            GetRespawnPose(out Vector3 spawnPos, out Quaternion spawnRot);
+            if (locomotion != null) locomotion.TeleportTo(spawnPos, spawnRot);
+            else transform.SetPositionAndRotation(spawnPos, spawnRot);
+
+            if (CameraManager.Instance != null) CameraManager.Instance.SnapBehindTarget();
+            GameLog.Info($"[PlayerDeathHandler] Oyun '{stats.LastBonfireName}' bonfire'ında başladı");
+        }
+
+        /// <summary>
+        /// Son dinlenilen bonfire'ı kimliğiyle bulur (eski kayıtlarda konuma en yakın olanı);
+        /// karakteri ateşin arkasına, ateşin baktığı yöne dönük ve yere oturmuş şekilde yerleştirir.
+        /// Hiç bonfire'da dinlenilmediyse sahnedeki başlangıç noktası kullanılır.
+        /// </summary>
         private void GetRespawnPose(out Vector3 position, out Quaternion rotation)
         {
             if (!stats.LastBonfirePosition.HasValue)
@@ -137,29 +170,53 @@ namespace SoulsRPG.Player
                 return;
             }
 
-            Vector3 bonfirePos = stats.LastBonfirePosition.Value;
-
-            // Kayıtlı konuma en yakın bonfire objesini bul, önüne yerleştir ve ateşe baktır
-            Bonfire nearest = null;
-            float best = float.MaxValue;
-            foreach (var b in FindObjectsByType<Bonfire>())
+            Vector3 savedPos = stats.LastBonfirePosition.Value;
+            Bonfire bonfire = Bonfire.FindById(stats.LastBonfireId);
+            if (bonfire == null)
             {
-                float d = (b.transform.position - bonfirePos).sqrMagnitude;
-                if (d < best)
+                bonfire = Bonfire.FindNearest(savedPos);
+                // Bulunan ateş kayıtlı konumdan çok uzaksa ona güvenme (bonfire silinmiş/taşınmış olabilir)
+                if (bonfire != null && (bonfire.transform.position - savedPos).sqrMagnitude > 25f) bonfire = null;
+            }
+
+            if (bonfire != null)
+            {
+                bonfire.GetSpawnPose(bonfireSpawnOffset, out position, out rotation);
+            }
+            else
+            {
+                position = savedPos - Vector3.forward * bonfireSpawnOffset;
+                rotation = Quaternion.identity;
+            }
+
+            position = SnapToGround(position);
+        }
+
+        /// <summary>
+        /// Noktayı zemine oturtur ve karakterin pivot yüksekliğini ekler
+        /// (pivot kapsülün ortasındaysa yere gömülmesini önler).
+        /// </summary>
+        private Vector3 SnapToGround(Vector3 point)
+        {
+            Vector3 origin = point + Vector3.up * 3f;
+            var hits = Physics.RaycastAll(origin, Vector3.down, 12f, ~0, QueryTriggerInteraction.Ignore);
+            float bestDist = float.MaxValue;
+            bool found = false;
+            float groundY = point.y;
+            foreach (var h in hits)
+            {
+                // Oyuncunun kendi kapsülünü yok say
+                if (h.collider.transform == transform || h.collider.transform.IsChildOf(transform)) continue;
+                if (h.distance < bestDist)
                 {
-                    best = d;
-                    nearest = b;
+                    bestDist = h.distance;
+                    groundY = h.point.y;
+                    found = true;
                 }
             }
 
-            Vector3 forward = nearest != null ? nearest.transform.forward : Vector3.forward;
-            forward.y = 0f;
-            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
-            forward.Normalize();
-
-            position = bonfirePos + forward * bonfireSpawnOffset;
-            position.y = Mathf.Max(position.y, bonfirePos.y);
-            rotation = Quaternion.LookRotation(-forward);
+            if (!found) groundY = point.y;
+            return new Vector3(point.x, groundY + pivotHeightAboveFeet + 0.05f, point.z);
         }
 
         private IEnumerator Fade(System.Action<float> apply, float from, float to, float duration)

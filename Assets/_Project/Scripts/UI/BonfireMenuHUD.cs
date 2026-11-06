@@ -39,6 +39,7 @@ namespace SoulsRPG.UI
         private Text soulsText;
         private Text costText;
         private Text feedbackText;
+        private Text subTitleText;
 
         // Attribute Rows
         private Text vigText, endText, strText, dexText, vitText;
@@ -132,6 +133,12 @@ namespace SoulsRPG.UI
 
             EnsureEventSystem();
             EnsureUIHierarchy();
+
+            // Hangi ateşte dinlenildiği başlıkta görünsün
+            if (subTitleText != null && activeBonfire != null)
+            {
+                subTitleText.text = activeBonfire.DisplayName;
+            }
 
             if (rootGo != null)
             {
@@ -636,7 +643,7 @@ namespace SoulsRPG.UI
 
             // Title & Subtitle
             CreateText(mainPanel.transform, "Title", "ATEŞ BAŞI (BONFIRE)", font, 22, FontStyle.Bold, new Color(0.95f, 0.85f, 0.55f), new Vector2(0f, 175f), new Vector2(340f, 40f));
-            CreateText(mainPanel.transform, "SubTitle", "Kale Avlusu Ateşi", font, 13, FontStyle.Italic, new Color(0.7f, 0.65f, 0.55f), new Vector2(0f, 142f), new Vector2(340f, 30f));
+            subTitleText = CreateText(mainPanel.transform, "SubTitle", activeBonfire != null ? activeBonfire.DisplayName : "", font, 13, FontStyle.Italic, new Color(0.7f, 0.65f, 0.55f), new Vector2(0f, 142f), new Vector2(340f, 30f));
 
             // Main Buttons
             mainButtonImages.Clear();
@@ -648,7 +655,7 @@ namespace SoulsRPG.UI
             {
                 if (PlayerStats.Instance != null && activeBonfire != null)
                 {
-                    PlayerStats.Instance.RestAtBonfire(activeBonfire.transform.position);
+                    PlayerStats.Instance.RestAtBonfire(activeBonfire.Id, activeBonfire.DisplayName, activeBonfire.transform.position);
                     Core.GameLog.Info("[Bonfire] Oyun kaydedildi, can ve stamina dolduruldu");
                     if (feedbackText != null) feedbackText.text = "<color=green>Oyun Kaydedildi!</color>";
                 }
