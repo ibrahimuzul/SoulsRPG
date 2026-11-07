@@ -178,10 +178,16 @@ namespace SoulsRPG.Player
 
             bool kbSprint = Input.GetKey(KeyCode.LeftShift);
 
-            // DualSense ◯ (Button 2) veya ✕ (Button 1)
-            bool bDown = Input.GetKeyDown(KeyCode.JoystickButton2) || Input.GetKeyDown(KeyCode.JoystickButton1);
-            bool bHeld = Input.GetKey(KeyCode.JoystickButton2) || Input.GetKey(KeyCode.JoystickButton1);
-            bool bUp   = Input.GetKeyUp(KeyCode.JoystickButton2) || Input.GetKeyUp(KeyCode.JoystickButton1);
+            // DualSense ◯ (Button 2): basılı tut = koş, bas-bırak = yuvarlan
+            bool bDown = Input.GetKeyDown(KeyCode.JoystickButton2);
+            bool bHeld = Input.GetKey(KeyCode.JoystickButton2);
+            bool bUp   = Input.GetKeyUp(KeyCode.JoystickButton2);
+
+            // DualSense ✕ (Button 1): zıpla
+            if (Input.GetKeyDown(KeyCode.JoystickButton1))
+            {
+                locomotion.AttemptJump();
+            }
 
             if (bDown)
             {

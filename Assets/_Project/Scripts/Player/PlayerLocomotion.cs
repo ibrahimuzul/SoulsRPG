@@ -62,6 +62,43 @@ namespace SoulsRPG.Player
         [SerializeField] private float gravity = -20f;
         [SerializeField] private LayerMask groundLayers;
 
+        [Header("Jump (X)")]
+        [Tooltip("Zıplama yüksekliği (metre)")]
+        [SerializeField] private float jumpHeight = 1.1f;
+        [SerializeField] private float jumpStaminaCost = 12f;
+        [Tooltip("Havadayken yön değiştirme ivmesi (m/s²). Düşük = kalkıştaki yönde gider, yüksek = havada serbestçe yönlendirilir")]
+        [SerializeField] private float airAcceleration = 6f;
+
+        private bool isJumping;
+        private Vector3 airVelocity;
+        private Vector3 lastGroundVelocity;
+        public bool IsJumping => isJumping;
+
+        /// <summary>X ile zıplama: yerdeyken ve başka bir eylem yokken, stamina harcar.</summary>
+        public void AttemptJump()
+        {
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isResting || isUsingItem || isJumping) return;
+            if (characterController == null || !characterController.isGrounded) return;
+            if (!playerStats.UseStamina(jumpStaminaCost)) return;
+
+            SetBlockingForced(false);
+            isSprinting = false;
+            isJumping = true;
+            airVelocity = new Vector3(lastGroundVelocity.x, 0f, lastGroundVelocity.z);
+            verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
+            Audio.SoulsAudioManager.GetOrCreate().PlayRoll(transform.position);
+        }
+
+        private void ApplyGravityOnly()
+        {
+            if (isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
+            else verticalVelocity += gravity * Time.deltaTime;
+            if (characterController != null && characterController.enabled)
+            {
+                characterController.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
+            }
+        }
+
         // Components
         private CharacterController characterController;
         private PlayerStats playerStats;
@@ -108,7 +145,7 @@ namespace SoulsRPG.Player
         public bool IsUsingItem => isUsingItem;
 
         /// <summary>Şu an bir item kullanılabilir mi (iksir içmeye başlamak için).</summary>
-        public bool CanUseItem => !playerStats.isDead && !isRolling && !isAttacking && !isStaggered && !isResting && !isUsingItem;
+        public bool CanUseItem => !playerStats.isDead && !isRolling && !isAttacking && !isStaggered && !isResting && !isUsingItem && !isJumping;
 
         public void SetUsingItem(bool usingItem, float speedMultiplier = 0.35f)
         {
@@ -251,9 +288,22 @@ namespace SoulsRPG.Player
 
         public void HandleMovement(float horizontal, float vertical, bool sprintInput)
         {
-            if (playerStats.isDead || isRolling || isStaggered || isResting) return;
+            if (playerStats.isDead || isRolling || isResting) return;
 
             CheckGrounded();
+
+            // İnişe geçildi
+            if (isJumping && isGrounded && verticalVelocity <= 0f)
+            {
+                isJumping = false;
+            }
+
+            // Sendelerken hareket yok ama yerçekimi işlesin (havada vurulursa askıda kalmasın)
+            if (isStaggered)
+            {
+                ApplyGravityOnly();
+                return;
+            }
 
             // Dark Souls Saldırı Kuralı: Kılıç/silah sallarken yürünemez ve koşulamaz! (Attack Commitment)
             if (isAttacking)
@@ -282,7 +332,7 @@ namespace SoulsRPG.Player
             lastInputVector = inputVector;
 
             // Handle Sprinting (Cannot sprint while blocking)
-            isSprinting = sprintInput && !isBlocking && !isUsingItem && inputVector.magnitude > 0.1f && playerStats.HasStamina(5f);
+            isSprinting = sprintInput && !isBlocking && !isUsingItem && !isJumping && inputVector.magnitude > 0.1f && playerStats.HasStamina(5f);
             if (isSprinting)
             {
                 playerStats.UseStamina(sprintStaminaCostPerSec * Time.deltaTime);
@@ -314,6 +364,17 @@ namespace SoulsRPG.Player
 
             // Apply Horizontal Movement
             Vector3 finalMove = inputVector * currentSpeed;
+
+            // Havada (zıplama): kalkıştaki hız korunur, yön sadece biraz değiştirilebilir
+            if (isJumping)
+            {
+                airVelocity = Vector3.MoveTowards(airVelocity, finalMove, airAcceleration * Time.deltaTime);
+                finalMove = airVelocity;
+            }
+            else
+            {
+                lastGroundVelocity = finalMove;
+            }
 
             // Handle Gravity
             if (isGrounded && verticalVelocity < 0f)
@@ -371,7 +432,7 @@ namespace SoulsRPG.Player
 
         public void AttemptDodgeRoll(float horizontal, float vertical)
         {
-            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isResting || isUsingItem) return;
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isResting || isUsingItem || isJumping) return;
 
             Vector3 inputVector = GetCameraRelativeInput(horizontal, vertical);
             bool isRoll = inputVector.magnitude > 0.1f;
@@ -470,7 +531,7 @@ namespace SoulsRPG.Player
         /// <param name="heavy">true: R2 ağır saldırı (daha yavaş, daha fazla hasar ve stamina)</param>
         public void AttemptAttack(bool heavy = false)
         {
-            if (playerStats.isDead || isRolling || isAttacking || isStaggered || isResting || isUsingItem) return;
+            if (playerStats.isDead || isRolling || isAttacking || isStaggered || isResting || isUsingItem || isJumping) return;
 
             float cost = heavy ? attackStaminaCost * heavyStaminaMultiplier : attackStaminaCost;
             if (playerStats.UseStamina(cost))
@@ -768,6 +829,7 @@ namespace SoulsRPG.Player
             isStaggered = false;
             isSprinting = false;
             isUsingItem = false;
+            isJumping = false;
             SetBlockingForced(false);
             if (animator != null) animator.SetFloat("Speed", 0f);
         }
@@ -788,6 +850,7 @@ namespace SoulsRPG.Player
             transform.SetPositionAndRotation(position, rotation);
             if (characterController != null) characterController.enabled = true;
             verticalVelocity = -2f;
+            isJumping = false;
         }
 
         private void CheckGrounded()
