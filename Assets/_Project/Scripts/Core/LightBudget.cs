@@ -45,7 +45,9 @@ namespace SoulsRPG.Core
         private static void AutoCreate()
         {
             if (Instance != null) return;
-            new GameObject("--- LIGHT BUDGET ---").AddComponent<LightBudget>();
+            var go = new GameObject("--- LIGHT BUDGET ---");
+            DontDestroyOnLoad(go); // menüden oyuna geçişte (sahne değişimi) silinmesin
+            go.AddComponent<LightBudget>();
         }
 
         private void Awake()

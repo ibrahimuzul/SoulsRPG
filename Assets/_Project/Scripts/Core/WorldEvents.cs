@@ -11,9 +11,28 @@ namespace SoulsRPG.Core
     {
         public static event Action OnWorldReset;
 
+        /// <summary>
+        /// Oyuncu ilk kez yerleşti, çevresindeki bölgeler yüklendi; oyun oynanabilir.
+        /// Yükleme ekranı bunu bekleyip kapanır.
+        /// </summary>
+        public static event Action OnWorldReady;
+        public static bool IsWorldReady { get; private set; }
+
         public static void ResetWorld()
         {
             OnWorldReset?.Invoke();
+        }
+
+        public static void RaiseWorldReady()
+        {
+            IsWorldReady = true;
+            OnWorldReady?.Invoke();
+        }
+
+        /// <summary>Yeni bir dünya yüklemesi başlarken (menüden Continue / New Game).</summary>
+        public static void ResetWorldReady()
+        {
+            IsWorldReady = false;
         }
 
         // "Enter Play Mode Options" ile domain reload kapalıyken eski abonelikleri temizle
@@ -21,6 +40,8 @@ namespace SoulsRPG.Core
         private static void ClearStatics()
         {
             OnWorldReset = null;
+            OnWorldReady = null;
+            IsWorldReady = false;
         }
     }
 

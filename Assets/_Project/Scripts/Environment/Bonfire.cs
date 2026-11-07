@@ -80,6 +80,10 @@ namespace SoulsRPG.Environment
             bool isCore = map != null && scene.name == map.coreScene;
             if (isCore) return;
 
+            // Bölge değilse: sadece içinde oyuncu olan eski tek sahneye (SoulsTestArena) bonfire ekle.
+            // Açılış menüsü gibi oyun dışı sahnelere dokunma.
+            if (!isRegion && !SceneHasPlayer(scene)) return;
+
             foreach (var def in DefaultBonfires)
             {
                 if (isRegion && def.RegionScene != scene.name) continue;
@@ -91,6 +95,15 @@ namespace SoulsRPG.Environment
                     SceneManager.MoveGameObjectToScene(bonfire.gameObject, scene);
                 }
             }
+        }
+
+        private static bool SceneHasPlayer(Scene scene)
+        {
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (root.GetComponentInChildren<PlayerStats>(true) != null) return true;
+            }
+            return false;
         }
 
         /// <summary>Sahnede bu tanıma karşılık gelen bir bonfire var mı (aynı id veya 3 m yakınında)?</summary>

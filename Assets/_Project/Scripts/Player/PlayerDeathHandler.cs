@@ -100,6 +100,9 @@ namespace SoulsRPG.Player
                 Bloodstain.Spawn(stats.BloodstainPosition.Value);
             }
 
+            // Dünya hazır: yükleme ekranı (menüden gelindiyse) kapanır, siyah perde açılır
+            WorldEvents.RaiseWorldReady();
+
             if (streamed)
             {
                 if (locomotion != null) locomotion.SetResting(false);

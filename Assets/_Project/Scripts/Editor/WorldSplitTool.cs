@@ -468,6 +468,9 @@ namespace SoulsRPG.EditorTools
                 added.Add(path);
             }
 
+            // 0. Açılış ekranı her zaman ilk sırada (build'de oyun buradan açılır)
+            Add(MainMenuBuildSetup.MainMenuPath, true);
+
             // 1. Core + bölgeler (WorldMap'te sonradan eklenen bölgeler dahil)
             Add(CorePath, true);
             var map = AssetDatabase.LoadAssetAtPath<WorldMap>(MapAssetPath);
