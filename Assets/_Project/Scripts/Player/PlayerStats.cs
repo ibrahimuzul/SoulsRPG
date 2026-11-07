@@ -106,6 +106,15 @@ namespace SoulsRPG.Player
             SaveManager.SavePlayer(this);
         }
 
+        /// <summary>Test kolaylığı: yenilmiş boss listesini (bellekte ve kayıtta) boşaltır. Kaç boss sıfırlandığını döndürür.</summary>
+        public int ClearDefeatedBosses()
+        {
+            int count = defeatedBosses.Count;
+            defeatedBosses.Clear();
+            SaveManager.SavePlayer(this);
+            return count;
+        }
+
         // Ruh lekesi (Bloodstain): ölünce kaybedilen ruhlar
         public Vector3? BloodstainPosition { get; private set; }
         public int BloodstainSouls { get; private set; }

@@ -154,6 +154,28 @@ namespace SoulsRPG.Save
             }
         }
 
+        /// <summary>
+        /// Test kolaylığı: kayıttaki yenilmiş boss listesini boşaltır, diğer her şeyi (seviye, ruh, bonfire, itemlar) korur.
+        /// Kaç boss'un sıfırlandığını döndürür (kayıt yoksa -1).
+        /// </summary>
+        public static int ClearDefeatedBossesInFile()
+        {
+            var data = LoadPlayer();
+            if (data == null) return -1;
+            int count = data.defeatedBosses != null ? data.defeatedBosses.Count : 0;
+            data.defeatedBosses = new System.Collections.Generic.List<string>();
+            try
+            {
+                File.WriteAllText(SaveFilePath, JsonUtility.ToJson(data, true));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SaveManager] Kayıt yazılamadı: {ex.Message}");
+                return -1;
+            }
+            return count;
+        }
+
         public static void DeleteSave()
         {
             if (HasSaveFile())
