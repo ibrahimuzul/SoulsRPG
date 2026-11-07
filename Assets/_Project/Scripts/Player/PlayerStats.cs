@@ -61,6 +61,8 @@ namespace SoulsRPG.Player
         public event Action OnStatsUpdated;
         public event Action OnDeath;
         public event Action OnRespawn;
+        /// <summary>Bonfire'da dinlenildi (kayıttan hemen önce çağrılır).</summary>
+        public event Action OnRestedAtBonfire;
 
         // Public Properties
         public int SoulLevel => soulLevel;
@@ -133,6 +135,10 @@ namespace SoulsRPG.Player
             {
                 gameObject.AddComponent<PlayerDeathHandler>();
             }
+
+            // Item kutusu (iksirler vb.) ve item kullanımı
+            if (GetComponent<Items.ItemBox>() == null) gameObject.AddComponent<Items.ItemBox>();
+            if (GetComponent<Items.PlayerItemUser>() == null) gameObject.AddComponent<Items.PlayerItemUser>();
 
             // Kayıtlı veriyi yükle (veya varsayılanları hesapla)
             LoadSavedData();
@@ -295,6 +301,9 @@ namespace SoulsRPG.Player
             // Souls kuralı: dinlenince düşmanlar yeniden doğar
             WorldEvents.ResetWorld();
 
+            // İksirler vb. dolar (kayıttan önce, yenilenmiş adetler kaydedilsin)
+            OnRestedAtBonfire?.Invoke();
+
             // Kaydet
             SaveManager.SavePlayer(this, bonfirePosition);
         }
@@ -349,6 +358,11 @@ namespace SoulsRPG.Player
         private void LoadSavedData()
         {
             var data = SaveManager.LoadPlayer();
+
+            // Item kutusu kendi kısmını yükler (kayıt yoksa başlangıç itemları: 3 Can İksiri)
+            var itemBox = GetComponent<Items.ItemBox>();
+            if (itemBox != null) itemBox.LoadFromSave(data);
+
             if (data != null)
             {
                 soulLevel = data.soulLevel;

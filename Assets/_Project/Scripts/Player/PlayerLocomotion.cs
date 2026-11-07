@@ -101,6 +101,25 @@ namespace SoulsRPG.Player
         public bool IsBlocking => isBlocking;
         public bool IsGrounded => isGrounded;
         public bool IsStaggered => isStaggered;
+
+        // Item kullanımı (iksir içme): bu sürede saldırı / yuvarlanma / blok / koşu yok, yürüme yavaş
+        private bool isUsingItem;
+        private float itemUseSpeedMultiplier = 0.35f;
+        public bool IsUsingItem => isUsingItem;
+
+        /// <summary>Şu an bir item kullanılabilir mi (iksir içmeye başlamak için).</summary>
+        public bool CanUseItem => !playerStats.isDead && !isRolling && !isAttacking && !isStaggered && !isResting && !isUsingItem;
+
+        public void SetUsingItem(bool usingItem, float speedMultiplier = 0.35f)
+        {
+            isUsingItem = usingItem;
+            itemUseSpeedMultiplier = speedMultiplier;
+            if (usingItem)
+            {
+                isSprinting = false;
+                SetBlockingForced(false);
+            }
+        }
         public bool IsAttacking => isAttacking;
         public bool isResting = false;
         public bool IsResting => isResting;
@@ -263,14 +282,19 @@ namespace SoulsRPG.Player
             lastInputVector = inputVector;
 
             // Handle Sprinting (Cannot sprint while blocking)
-            isSprinting = sprintInput && !isBlocking && inputVector.magnitude > 0.1f && playerStats.HasStamina(5f);
+            isSprinting = sprintInput && !isBlocking && !isUsingItem && inputVector.magnitude > 0.1f && playerStats.HasStamina(5f);
             if (isSprinting)
             {
                 playerStats.UseStamina(sprintStaminaCostPerSec * Time.deltaTime);
             }
 
             float currentSpeed = walkSpeed;
-            if (isBlocking)
+            if (isUsingItem)
+            {
+                // İksir içerken ağır adımlarla yürünür
+                currentSpeed = walkSpeed * itemUseSpeedMultiplier;
+            }
+            else if (isBlocking)
             {
                 currentSpeed = walkSpeed * 0.7f;
             }
@@ -283,7 +307,7 @@ namespace SoulsRPG.Player
                 float targetAnimSpeed = 0f;
                 if (inputVector.magnitude > 0.1f)
                 {
-                    targetAnimSpeed = isSprinting ? 1.0f : 0.5f;
+                    targetAnimSpeed = isSprinting ? 1.0f : (isUsingItem ? 0.25f : 0.5f);
                 }
                 animator.SetFloat("Speed", targetAnimSpeed, 0.1f, Time.deltaTime);
             }
@@ -347,7 +371,7 @@ namespace SoulsRPG.Player
 
         public void AttemptDodgeRoll(float horizontal, float vertical)
         {
-            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isResting) return;
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isResting || isUsingItem) return;
 
             Vector3 inputVector = GetCameraRelativeInput(horizontal, vertical);
             bool isRoll = inputVector.magnitude > 0.1f;
@@ -446,7 +470,7 @@ namespace SoulsRPG.Player
         /// <param name="heavy">true: R2 ağır saldırı (daha yavaş, daha fazla hasar ve stamina)</param>
         public void AttemptAttack(bool heavy = false)
         {
-            if (playerStats.isDead || isRolling || isAttacking || isStaggered || isResting) return;
+            if (playerStats.isDead || isRolling || isAttacking || isStaggered || isResting || isUsingItem) return;
 
             float cost = heavy ? attackStaminaCost * heavyStaminaMultiplier : attackStaminaCost;
             if (playerStats.UseStamina(cost))
@@ -620,7 +644,7 @@ namespace SoulsRPG.Player
 
         public void SetBlocking(bool blocking)
         {
-            if (playerStats.isDead || isRolling || isStaggered || isAttacking)
+            if (playerStats.isDead || isRolling || isStaggered || isAttacking || isUsingItem)
             {
                 isBlocking = false;
                 if (animator != null) animator.SetBool("isBlocking", false);
@@ -743,6 +767,7 @@ namespace SoulsRPG.Player
             }
             isStaggered = false;
             isSprinting = false;
+            isUsingItem = false;
             SetBlockingForced(false);
             if (animator != null) animator.SetFloat("Speed", 0f);
         }

@@ -41,7 +41,19 @@ namespace SoulsRPG.Save
         public float bloodstainY = 0f;
         public float bloodstainZ = 0f;
 
+        // Item kutusu (ItemBox): eldeki itemlar ve adetleri.
+        // hasItemBox=false olan eski kayıtlarda oyuncuya başlangıç itemları verilir.
+        public bool hasItemBox = false;
+        public System.Collections.Generic.List<SavedItemStack> items = new System.Collections.Generic.List<SavedItemStack>();
+
         public string saveTimestamp = "";
+    }
+
+    [System.Serializable]
+    public class SavedItemStack
+    {
+        public string id;
+        public int count;
     }
 
     /// <summary>
@@ -97,6 +109,9 @@ namespace SoulsRPG.Save
                 }
 
                 data.defeatedBosses = new System.Collections.Generic.List<string>(stats.DefeatedBosses);
+
+                var itemBox = stats.GetComponent<Items.ItemBox>();
+                if (itemBox != null) itemBox.WriteToSave(data);
 
                 if (stats.BloodstainPosition.HasValue && stats.BloodstainSouls > 0)
                 {
