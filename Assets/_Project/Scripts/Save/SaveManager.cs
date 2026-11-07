@@ -28,6 +28,11 @@ namespace SoulsRPG.Save
         // Son dinlenilen bonfire'ın kimliği ve adı (doğma noktası bu id ile bulunur; konum yedek olarak kalır)
         public string lastBonfireId = "";
         public string lastBonfireName = "";
+        // Bonfire'ın bulunduğu bölge sahnesi (doğarken önce bu sahne yüklenir)
+        public string lastBonfireScene = "";
+
+        // Yenilen boss'lar (bölge yeniden yüklenince geri gelmesinler)
+        public System.Collections.Generic.List<string> defeatedBosses = new System.Collections.Generic.List<string>();
 
         // Ruh Lekesi (Bloodstain): ölünce düşen ruhlar
         public bool hasBloodstain = false;
@@ -88,7 +93,10 @@ namespace SoulsRPG.Save
                 {
                     data.lastBonfireId = stats.LastBonfireId ?? "";
                     data.lastBonfireName = stats.LastBonfireName ?? "";
+                    data.lastBonfireScene = stats.LastBonfireScene ?? "";
                 }
+
+                data.defeatedBosses = new System.Collections.Generic.List<string>(stats.DefeatedBosses);
 
                 if (stats.BloodstainPosition.HasValue && stats.BloodstainSouls > 0)
                 {

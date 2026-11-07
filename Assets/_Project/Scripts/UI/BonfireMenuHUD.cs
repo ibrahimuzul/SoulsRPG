@@ -101,7 +101,7 @@ namespace SoulsRPG.UI
                 return Instance;
             }
 
-            var canvas = FindAnyObjectByType<Canvas>();
+            var canvas = HudCanvas.Get();
             GameObject host = canvas != null ? canvas.gameObject : new GameObject("--- BONFIRE MENU HUD ---");
             Instance = host.AddComponent<BonfireMenuHUD>();
             return Instance;
@@ -109,12 +109,16 @@ namespace SoulsRPG.UI
 
         public static void EnsureEventSystem()
         {
-            var es = FindAnyObjectByType<EventSystem>();
+            // Pasif olanlar dahil ara: sahne yüklenirken Core'daki EventSystem henüz bulunamayabiliyordu ve
+            // ikinci bir tane oluşuyordu (Unity her karede "2 event systems" uyarısı basıp editörü yavaşlatıyordu)
+            var all = FindObjectsByType<EventSystem>(FindObjectsInactive.Include);
+            var es = all.Length > 0 ? all[0] : null;
             if (es == null)
             {
-                var esGo = new GameObject("--- EVENT SYSTEM ---");
+                var esGo = new GameObject("--- EVENT SYSTEM (runtime) ---");
                 es = esGo.AddComponent<EventSystem>();
                 esGo.AddComponent<StandaloneInputModule>();
+                esGo.AddComponent<RuntimeEventSystemGuard>(); // sahnedeki asıl EventSystem gelirse kendini siler
                 Core.GameLog.Info("[BonfireMenu] UI EventSystem oluşturuldu");
             }
             else
@@ -581,7 +585,7 @@ namespace SoulsRPG.UI
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
             {
-                canvas = FindAnyObjectByType<Canvas>();
+                canvas = HudCanvas.Get();
             }
 
             if (canvas == null)
@@ -655,7 +659,7 @@ namespace SoulsRPG.UI
             {
                 if (PlayerStats.Instance != null && activeBonfire != null)
                 {
-                    PlayerStats.Instance.RestAtBonfire(activeBonfire.Id, activeBonfire.DisplayName, activeBonfire.transform.position);
+                    PlayerStats.Instance.RestAtBonfire(activeBonfire.Id, activeBonfire.DisplayName, activeBonfire.SceneName, activeBonfire.transform.position);
                     Core.GameLog.Info("[Bonfire] Oyun kaydedildi, can ve stamina dolduruldu");
                     if (feedbackText != null) feedbackText.text = "<color=green>Oyun Kaydedildi!</color>";
                 }

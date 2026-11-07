@@ -1,6 +1,8 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using SoulsRPG.Core;
 using SoulsRPG.Environment;
 
 namespace SoulsRPG.EditorTools
@@ -26,7 +28,24 @@ namespace SoulsRPG.EditorTools
             {
                 if (Bonfire.ExistsFor(def)) continue;
 
+                // Dünya bölgelere ayrıldıysa: bonfire'ın bölge sahnesi açık değilse atla (yanlış sahneye düşmesin)
+                var map = WorldMap.Instance;
+                Scene targetScene = SceneManager.GetActiveScene();
+                if (map != null && map.IsRegion(def.RegionScene))
+                {
+                    targetScene = SceneManager.GetSceneByName(def.RegionScene);
+                    if (!targetScene.IsValid() || !targetScene.isLoaded)
+                    {
+                        Debug.LogWarning($"[SoulsRPG] '{def.Name}' için {def.RegionScene} sahnesi açık değil, atlandı.");
+                        continue;
+                    }
+                }
+
                 var bonfire = Bonfire.Create(def);
+                if (bonfire.gameObject.scene != targetScene)
+                {
+                    SceneManager.MoveGameObjectToScene(bonfire.gameObject, targetScene);
+                }
                 Undo.RegisterCreatedObjectUndo(bonfire.gameObject, "Place Bonfire");
                 EditorUtility.SetDirty(bonfire);
                 EditorSceneManager.MarkSceneDirty(bonfire.gameObject.scene);

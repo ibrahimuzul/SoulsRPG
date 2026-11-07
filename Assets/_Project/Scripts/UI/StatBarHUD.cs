@@ -181,7 +181,7 @@ namespace SoulsRPG.UI
         {
             if (soulsCounterText != null) return;
 
-            Canvas canvas = GetComponentInParent<Canvas>() ?? FindAnyObjectByType<Canvas>();
+            Canvas canvas = GetComponentInParent<Canvas>() ?? HudCanvas.Get();
             if (canvas == null) return;
 
             var existing = canvas.transform.Find("SoulsCounter_Container");

@@ -4,5 +4,20 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/_Project/Scenes/World/Core.unity
+    guid: a64c0b4fb9314da4ba78fadf3c748efa
+  - enabled: 1
+    path: Assets/_Project/Scenes/World/Region_KaleAvlusu.unity
+    guid: c0d3693b44f5a4044a0a5eed631fccbd
+  - enabled: 1
+    path: Assets/_Project/Scenes/World/Region_MuhafizKapisi.unity
+    guid: d22a761c349091645be59946517bd8e4
+  - enabled: 0
+    path: Assets/_Project/Scenes/SoulsTestArena.unity
+    guid: 37258c33bef5e014d8a461f24b3e8c3f
+  - enabled: 1
+    path: Assets/_Project/Scenes/World/Region_EskiMezarlik.unity
+    guid: 603430106b41aed47b43ba3d78b85007
   m_configObjects: {}

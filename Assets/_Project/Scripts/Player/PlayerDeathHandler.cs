@@ -9,9 +9,10 @@ using SoulsRPG.Save;
 namespace SoulsRPG.Player
 {
     /// <summary>
-    /// Souls ölüm döngüsü:
-    /// ÖLDÜN ekranı → ruhlar ölüm noktasına ruh lekesi olarak düşer → son bonfire'da (yoksa başlangıç noktasında)
-    /// yeniden doğma → dünya (düşmanlar + boss) sıfırlanır → kayıt.
+    /// Souls ölüm döngüsü ve oyuna giriş:
+    /// ÖLDÜN ekranı → ruhlar ölüm noktasına ruh lekesi olarak düşer → son bonfire'ın bölgesi yüklenir →
+    /// karakter o bonfire'da (yoksa başlangıç noktasında) doğar → dünya (düşmanlar + boss) sıfırlanır → kayıt.
+    /// Oyuna girişte de aynı yerleştirme kullanılır.
     /// PlayerStats.Awake tarafından otomatik eklenir.
     /// </summary>
     [RequireComponent(typeof(PlayerStats))]
@@ -37,7 +38,6 @@ namespace SoulsRPG.Player
 
         // UI
         private CanvasGroup textGroup;
-        private Image blackOverlay;
 
         private void Awake()
         {
@@ -71,14 +71,44 @@ namespace SoulsRPG.Player
         private void Start()
         {
             BuildUI();
+            StartCoroutine(InitialSpawnRoutine());
+        }
 
-            // Oyuna girişte son kaydedilen bonfire'da başla
-            SpawnAtSavedBonfire();
+        /// <summary>
+        /// Oyuna giriş: ekran siyahken son kaydedilen bonfire'ın bölgesi yüklenir, karakter oraya konur,
+        /// sonra bölge akışı başlar ve ekran açılır. Bölgelere ayrılmamış eski tek sahnede yükleme yapılmaz.
+        /// </summary>
+        private IEnumerator InitialSpawnRoutine()
+        {
+            var streamer = WorldStreamer.Instance;
+            bool streamed = streamer != null && streamer.Map != null;
+
+            if (streamed)
+            {
+                ScreenFader.Instance.SetAlpha(1f);
+                if (locomotion != null) locomotion.SetResting(true); // yükleme bitene kadar hareket/yerçekimi yok
+            }
+
+            if (streamed || stats.LastBonfirePosition.HasValue)
+            {
+                yield return PlaceAtRespawn();
+            }
 
             // Önceki oturumdan kalan ruh lekesini geri getir
             if (stats.BloodstainPosition.HasValue && stats.BloodstainSouls > 0)
             {
                 Bloodstain.Spawn(stats.BloodstainPosition.Value);
+            }
+
+            if (streamed)
+            {
+                if (locomotion != null) locomotion.SetResting(false);
+                yield return ScreenFader.Instance.FadeTo(0f, fadeFromBlack);
+            }
+
+            if (stats.LastBonfirePosition.HasValue)
+            {
+                GameLog.Info($"[PlayerDeathHandler] Oyun '{stats.LastBonfireName}' bonfire'ında başladı");
             }
         }
 
@@ -102,24 +132,16 @@ namespace SoulsRPG.Player
             yield return new WaitForSeconds(textHold);
 
             // 2. Siyaha karar
-            yield return Fade(a => SetBlackAlpha(a), 0f, 1f, fadeToBlack);
+            yield return ScreenFader.Instance.FadeTo(1f, fadeToBlack);
             textGroup.alpha = 0f;
 
             // 3. Ruhlar ölüm noktasında kalır (önceki leke varsa kaybolur)
             Bloodstain.Clear();
             stats.DropSoulsAsBloodstain(deathPosition);
 
-            // 4. Son bonfire'da yeniden doğ
-            GetRespawnPose(out Vector3 spawnPos, out Quaternion spawnRot);
-            if (locomotion != null)
-            {
-                locomotion.ResetState();
-                locomotion.TeleportTo(spawnPos, spawnRot);
-            }
-            else
-            {
-                transform.SetPositionAndRotation(spawnPos, spawnRot);
-            }
+            // 4. Son bonfire'da yeniden doğ (bonfire başka bölgedeyse önce o bölge yüklenir)
+            if (locomotion != null) locomotion.ResetState();
+            yield return PlaceAtRespawn();
 
             stats.Respawn();
 
@@ -132,28 +154,64 @@ namespace SoulsRPG.Player
             // 5. Düşmanlar ve boss baştan
             WorldEvents.ResetWorld();
 
-            if (CameraManager.Instance != null) CameraManager.Instance.SnapBehindTarget();
-
             SaveManager.SavePlayer(stats);
 
             // 6. Siyahtan aç
-            yield return Fade(a => SetBlackAlpha(a), 1f, 0f, fadeFromBlack);
+            yield return ScreenFader.Instance.FadeTo(0f, fadeFromBlack);
             isHandlingDeath = false;
         }
 
         /// <summary>
-        /// Oyun açılınca karakteri son kaydedilen bonfire'a koyar (kayıt yoksa sahnedeki başlangıç noktasında kalır).
+        /// Karakteri son bonfire'a (yoksa başlangıç noktasına) koyar. Bölgelere ayrılmış dünyada önce
+        /// bonfire'ın bölgesi ve doğma noktasının çevresindeki bölgeler yüklenir; ekran bu sırada siyah olmalı.
         /// </summary>
-        private void SpawnAtSavedBonfire()
+        private IEnumerator PlaceAtRespawn()
         {
-            if (!stats.LastBonfirePosition.HasValue) return;
+            var streamer = WorldStreamer.Instance;
+            if (streamer != null && streamer.Map != null)
+            {
+                streamer.PauseStreaming();
+
+                string scene = ResolveRespawnScene(streamer.Map);
+                if (!string.IsNullOrEmpty(scene)) yield return streamer.EnsureLoaded(scene);
+
+                // Bonfire artık sahnede; doğma noktasının çevresini (zemin + komşu bölgeler) yükle
+                GetRespawnPose(out Vector3 roughPos, out _);
+                yield return streamer.EnsureLoadedAround(roughPos);
+
+                // Yeni yüklenen colliderların fizik sorgularına girmesi için bir fizik adımı bekle
+                yield return new WaitForFixedUpdate();
+                Physics.SyncTransforms();
+            }
 
             GetRespawnPose(out Vector3 spawnPos, out Quaternion spawnRot);
             if (locomotion != null) locomotion.TeleportTo(spawnPos, spawnRot);
             else transform.SetPositionAndRotation(spawnPos, spawnRot);
 
             if (CameraManager.Instance != null) CameraManager.Instance.SnapBehindTarget();
-            GameLog.Info($"[PlayerDeathHandler] Oyun '{stats.LastBonfireName}' bonfire'ında başladı");
+
+            if (streamer != null && streamer.Map != null) streamer.BeginStreaming(transform);
+        }
+
+        /// <summary>Doğulacak bonfire'ın hangi bölge sahnesinde olduğunu bulur.</summary>
+        private string ResolveRespawnScene(WorldMap map)
+        {
+            if (!stats.LastBonfirePosition.HasValue)
+            {
+                var start = map.FindRegionAt(initialSpawnPosition);
+                return start != null ? start.sceneName : map.defaultRegion;
+            }
+
+            // 1. Kayıttaki sahne (bölgeyse)
+            if (map.IsRegion(stats.LastBonfireScene)) return stats.LastBonfireScene;
+
+            // 2. Bonfire tanımındaki bölge (eski tek-sahne kayıtları için)
+            var def = Bonfire.FindDefinition(stats.LastBonfireId);
+            if (def.HasValue && map.IsRegion(def.Value.RegionScene)) return def.Value.RegionScene;
+
+            // 3. Kayıtlı konumu kapsayan bölge
+            var region = map.FindRegionAt(stats.LastBonfirePosition.Value);
+            return region != null ? region.sceneName : map.defaultRegion;
         }
 
         /// <summary>
@@ -232,34 +290,17 @@ namespace SoulsRPG.Player
             apply(to);
         }
 
-        private void SetBlackAlpha(float a)
-        {
-            if (blackOverlay == null) return;
-            var c = blackOverlay.color;
-            c.a = a;
-            blackOverlay.color = c;
-        }
-
         private void BuildUI()
         {
+            // Siyah perde artık ortak ScreenFader'da; burada sadece ÖLDÜN yazısı var
             var canvasGo = new GameObject("--- DEATH SCREEN ---");
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 500;
+            canvasGo.AddComponent<NotHudCanvas>();
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
-
-            // Siyah perde
-            var blackGo = new GameObject("BlackOverlay");
-            blackGo.transform.SetParent(canvasGo.transform, false);
-            var blackRect = blackGo.AddComponent<RectTransform>();
-            blackRect.anchorMin = Vector2.zero;
-            blackRect.anchorMax = Vector2.one;
-            blackRect.sizeDelta = Vector2.zero;
-            blackOverlay = blackGo.AddComponent<Image>();
-            blackOverlay.color = new Color(0f, 0f, 0f, 0f);
-            blackOverlay.raycastTarget = false;
 
             // ÖLDÜN şeridi + yazı
             var groupGo = new GameObject("DeathText");

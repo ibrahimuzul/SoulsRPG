@@ -178,7 +178,7 @@ namespace SoulsRPG.UI
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
             {
-                canvas = FindAnyObjectByType<Canvas>();
+                canvas = HudCanvas.Get();
             }
 
             if (canvas == null)

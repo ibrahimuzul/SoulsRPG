@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using SoulsRPG.Core;
 using SoulsRPG.Player;
 using SoulsRPG.UI;
 using SoulsRPG.Audio;
@@ -13,7 +15,7 @@ namespace SoulsRPG.Environment
     /// Kılıcın kül ve taş yığınına saplandığı, alevle yanan dinlenme ve kayıt noktası.
     /// Oyuncu yaklaştığında dinlenip oyunu kaydedebilir, can/dayanıklılığını doldurabilir ve seviye atlayabilir.
     /// </summary>
-    public class Bonfire : MonoBehaviour
+    public class Bonfire : MonoBehaviour, IStreamingAnchor
     {
         /// <summary>Oyunun bonfire listesi. Sahnede aynı kimlikte (veya 3 m yakınında) bir bonfire yoksa oyun başında otomatik oluşturulur.</summary>
         public struct BonfireDefinition
@@ -23,20 +25,31 @@ namespace SoulsRPG.Environment
             public Vector3 Position;
             /// <summary>Bonfire'ın baktığı yön (derece). Oyuncu ateşin arkasında, bu yöne bakarak doğar.</summary>
             public float Yaw;
+            /// <summary>Bonfire'ın ait olduğu bölge sahnesi (WorldMap).</summary>
+            public string RegionScene;
 
-            public BonfireDefinition(string id, string name, Vector3 position, float yaw)
+            public BonfireDefinition(string id, string name, Vector3 position, float yaw, string regionScene)
             {
-                Id = id; Name = name; Position = position; Yaw = yaw;
+                Id = id; Name = name; Position = position; Yaw = yaw; RegionScene = regionScene;
             }
         }
 
         public static readonly BonfireDefinition[] DefaultBonfires =
         {
             // Başlangıç: kale avlusunun güneyi, oyuncu kuzeye (arenaya) bakarak doğar
-            new BonfireDefinition("kale_avlusu_atesi", "Kale Avlusu Ateşi", new Vector3(0f, 0.09f, -10f), 0f),
+            new BonfireDefinition("kale_avlusu_atesi", "Kale Avlusu Ateşi", new Vector3(0f, 0.09f, -10f), 0f, WorldMap.CourtyardScene),
             // Boss bölgesine yakın ama boss'un (22 m) ve Kara Şövalye'nin (12 m) algı menzili dışında; oyuncu batıya, boss'a bakarak doğar
-            new BonfireDefinition("muhafiz_kapisi_atesi", "Muhafız Kapısı Ateşi", new Vector3(-4f, 0.09f, 20f), -90f),
+            new BonfireDefinition("muhafiz_kapisi_atesi", "Muhafız Kapısı Ateşi", new Vector3(-4f, 0.09f, 20f), -90f, WorldMap.BossGateScene),
         };
+
+        public static BonfireDefinition? FindDefinition(string id)
+        {
+            foreach (var def in DefaultBonfires)
+            {
+                if (def.Id == id) return def;
+            }
+            return null;
+        }
 
         private static readonly List<Bonfire> all = new List<Bonfire>();
         public static IReadOnlyList<Bonfire> All => all;
@@ -45,15 +58,38 @@ namespace SoulsRPG.Environment
         private static void ClearStatics()
         {
             all.Clear();
+            SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureBonfiresInScene()
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void HookSceneLoaded()
         {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        /// <summary>
+        /// Sahnede eksik bonfire'ları oluşturur (sahneye kalıcı yerleştirilmemişlerse):
+        /// - Bölge sahnesi yüklendiyse sadece o bölgeye ait bonfire'lar, o sahnenin içine.
+        /// - Bölgelere ayrılmamış eski tek sahnede (ör. SoulsTestArena) tüm bonfire'lar.
+        /// </summary>
+        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            var map = WorldMap.Instance;
+            bool isRegion = map != null && map.IsRegion(scene.name);
+            bool isCore = map != null && scene.name == map.coreScene;
+            if (isCore) return;
+
             foreach (var def in DefaultBonfires)
             {
+                if (isRegion && def.RegionScene != scene.name) continue;
                 if (ExistsFor(def)) continue;
-                Create(def);
+
+                var bonfire = Create(def);
+                if (bonfire.gameObject.scene != scene)
+                {
+                    SceneManager.MoveGameObjectToScene(bonfire.gameObject, scene);
+                }
             }
         }
 
@@ -146,28 +182,10 @@ namespace SoulsRPG.Environment
             rotation = Quaternion.LookRotation(forward);
         }
 
-        private static string Slugify(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return "bonfire";
-            var sb = new System.Text.StringBuilder(text.Length);
-            foreach (char raw in text.ToLowerInvariant())
-            {
-                char c = raw;
-                switch (c)
-                {
-                    case 'ş': c = 's'; break;
-                    case 'ğ': c = 'g'; break;
-                    case 'ı': c = 'i'; break;
-                    case 'i': c = 'i'; break;
-                    case 'ö': c = 'o'; break;
-                    case 'ü': c = 'u'; break;
-                    case 'ç': c = 'c'; break;
-                }
-                if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) sb.Append(c);
-                else if (sb.Length > 0 && sb[sb.Length - 1] != '_') sb.Append('_');
-            }
-            return sb.ToString().Trim('_');
-        }
+        private static string Slugify(string text) => IdUtil.Slugify(text);
+
+        /// <summary>Bonfire'ın bulunduğu sahne (bölgelere ayrılmış dünyada bölge sahnesi).</summary>
+        public string SceneName => gameObject.scene.name;
 
         private void OnEnable()
         {
@@ -259,7 +277,7 @@ namespace SoulsRPG.Environment
 
         private void CreateInteractionPrompt()
         {
-            var canvas = FindAnyObjectByType<Canvas>();
+            var canvas = HudCanvas.Get();
             if (canvas == null) return;
 
             promptUI = new GameObject("BonfirePromptUI");
@@ -355,7 +373,7 @@ namespace SoulsRPG.Environment
             // 2. Canı ve dayanıklılığı doldur, oyunu kaydet
             if (playerStats != null)
             {
-                playerStats.RestAtBonfire(Id, bonfireName, transform.position);
+                playerStats.RestAtBonfire(Id, bonfireName, SceneName, transform.position);
             }
 
             // 3. Bonfire Menüsünü Aç

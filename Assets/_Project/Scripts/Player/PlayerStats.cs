@@ -89,6 +89,20 @@ namespace SoulsRPG.Player
         public Vector3? LastBonfirePosition { get; private set; }
         public string LastBonfireId { get; private set; }
         public string LastBonfireName { get; private set; }
+        public string LastBonfireScene { get; private set; }
+
+        // Yenilen boss'lar (kayıtta tutulur)
+        private readonly System.Collections.Generic.HashSet<string> defeatedBosses = new System.Collections.Generic.HashSet<string>();
+        public System.Collections.Generic.IEnumerable<string> DefeatedBosses => defeatedBosses;
+
+        public bool IsBossDefeated(string bossId) => !string.IsNullOrEmpty(bossId) && defeatedBosses.Contains(bossId);
+
+        /// <summary>Boss'u yenildi olarak işaretler ve hemen kaydeder.</summary>
+        public void MarkBossDefeated(string bossId)
+        {
+            if (string.IsNullOrEmpty(bossId) || !defeatedBosses.Add(bossId)) return;
+            SaveManager.SavePlayer(this);
+        }
 
         // Ruh lekesi (Bloodstain): ölünce kaybedilen ruhlar
         public Vector3? BloodstainPosition { get; private set; }
@@ -106,6 +120,13 @@ namespace SoulsRPG.Player
 
         private void Awake()
         {
+            // Tek oyuncu: Core'daki oyuncu varken (ör. bir bölge sahnesine yanlışlıkla konmuş) ikinci bir kopya silinir
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning($"[PlayerStats] İkinci oyuncu bulundu ('{name}', sahne: {gameObject.scene.name}); siliniyor. Oyuncu yalnızca Core sahnesinde olmalı.");
+                Destroy(gameObject);
+                return;
+            }
             Instance = this;
 
             if (GetComponent<PlayerDeathHandler>() == null)
@@ -120,6 +141,11 @@ namespace SoulsRPG.Player
             currentHealth = maxHealth;
             currentStamina = maxStamina;
             currentPoise = maxPoise;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         private void Start()
@@ -249,7 +275,8 @@ namespace SoulsRPG.Player
         /// </summary>
         /// <param name="bonfireId">Bonfire'ın benzersiz kimliği (doğma noktası bununla bulunur)</param>
         /// <param name="bonfireName">Ekranda/kayıtta görünen adı</param>
-        public void RestAtBonfire(string bonfireId, string bonfireName, Vector3 bonfirePosition)
+        /// <param name="bonfireScene">Bonfire'ın bulunduğu sahne (bölge). Doğarken önce bu sahne yüklenir.</param>
+        public void RestAtBonfire(string bonfireId, string bonfireName, string bonfireScene, Vector3 bonfirePosition)
         {
             currentHealth = maxHealth;
             currentStamina = maxStamina;
@@ -257,6 +284,7 @@ namespace SoulsRPG.Player
             LastBonfirePosition = bonfirePosition;
             LastBonfireId = bonfireId;
             LastBonfireName = bonfireName;
+            LastBonfireScene = bonfireScene;
 
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
             OnStaminaChanged?.Invoke(currentStamina, maxStamina);
@@ -336,6 +364,13 @@ namespace SoulsRPG.Player
                     LastBonfirePosition = new Vector3(data.respawnX, data.respawnY, data.respawnZ);
                     LastBonfireId = data.lastBonfireId;
                     LastBonfireName = data.lastBonfireName;
+                    LastBonfireScene = data.lastBonfireScene;
+                }
+
+                defeatedBosses.Clear();
+                if (data.defeatedBosses != null)
+                {
+                    foreach (var id in data.defeatedBosses) defeatedBosses.Add(id);
                 }
 
                 if (data.hasBloodstain && data.bloodstainSouls > 0)

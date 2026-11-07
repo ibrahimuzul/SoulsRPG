@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c079818ba19192940830154442d5303b, type: 3}
+  m_Name: WorldMap
+  m_EditorClassIdentifier: Assembly-CSharp::SoulsRPG.Core.WorldMap
+  coreScene: Core
+  defaultRegion: Region_KaleAvlusu
+  loadDistance: 20
+  unloadDistance: 30
+  regions:
+  - sceneName: Region_KaleAvlusu
+    displayName: Kale Avlusu
+    bounds:
+      m_Center: {x: 0, y: 11.021317, z: 7.8003883}
+      m_Extent: {x: 67.838005, y: 22.517849, z: 73.41839}
+  - sceneName: Region_MuhafizKapisi
+    displayName: "Muhaf\u0131z Kap\u0131s\u0131"
+    bounds:
+      m_Center: {x: -16.904999, y: 0.35209584, z: 18.5}
+      m_Extent: {x: 16.904999, y: 4.3520956, z: 5.5}
+  - sceneName: Region_EskiMezarlik
+    displayName: "Eski Mezarl\u0131k"
+    bounds:
+      m_Center: {x: 49.637096, y: -3.5368347, z: -0.05492592}
+      m_Extent: {x: 52.137096, y: 16.965244, z: 31.719257}

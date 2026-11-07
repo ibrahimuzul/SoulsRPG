@@ -27,9 +27,11 @@ namespace SoulsRPG.Boss
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     [RequireComponent(typeof(LockOnTarget))]
-    public class BossController : MonoBehaviour, IDamageable
+    public class BossController : MonoBehaviour, IDamageable, IStreamingAnchor
     {
         [Header("Boss Identity")]
+        [Tooltip("Kayıtta tutulan benzersiz kimlik. Boş bırakılırsa addan üretilir.")]
+        [SerializeField] private string bossId = "";
         [SerializeField] private string bossName = "GÖLGE ŞÖVALYE KUMANDANI - MALAKOR";
         [SerializeField] private string phase1Title = "LANETLİ KALE MUHAFIZI";
         [SerializeField] private string phase2Title = "MALAKOR - LANETLİ GAZAP";
@@ -115,8 +117,27 @@ namespace SoulsRPG.Boss
             CacheRenderers();
         }
 
+        /// <summary>Kayıtta tutulan kimlik (boş bırakılırsa boss adından üretilir).</summary>
+        public string BossId => string.IsNullOrEmpty(bossId) ? IdUtil.Slugify(bossName) : bossId;
+
+        private static bool IsDefeatedInSave(string id)
+        {
+            if (PlayerStats.Instance != null) return PlayerStats.Instance.IsBossDefeated(id);
+
+            // Core henüz yüklenmediyse (bölge sahnesinden Play'e basıldıysa) kayda doğrudan bak
+            var data = Save.SaveManager.LoadPlayer();
+            return data != null && data.defeatedBosses != null && data.defeatedBosses.Contains(id);
+        }
+
         private void Start()
         {
+            // Yenilmiş boss bölge yeniden yüklenince geri gelmez
+            if (IsDefeatedInSave(BossId))
+            {
+                gameObject.SetActive(false);
+                return;
+            }
+
             var p = GameObject.FindGameObjectWithTag("Player") ?? GameObject.Find("Player");
             if (p != null)
             {
@@ -161,6 +182,15 @@ namespace SoulsRPG.Boss
         private void OnDisable()
         {
             WorldEvents.OnWorldReset -= ResetBoss;
+        }
+
+        private void OnDestroy()
+        {
+            // Dövüş sürerken bölge boşaltılırsa (oyuncu kaçıp uzaklaştı) can barı ekranda asılı kalmasın
+            if (isHUDActivated && !isDead && BossHealthBarHUD.Instance != null)
+            {
+                BossHealthBarHUD.Instance.HideBoss();
+            }
         }
 
         /// <summary>
@@ -810,6 +840,7 @@ namespace SoulsRPG.Boss
             if (PlayerStats.Instance != null)
             {
                 PlayerStats.Instance.AddSouls(soulsReward);
+                PlayerStats.Instance.MarkBossDefeated(BossId); // kaydeder
             }
 
             if (BossHealthBarHUD.Instance != null)

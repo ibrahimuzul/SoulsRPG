@@ -20,7 +20,7 @@ namespace SoulsRPG.Enemy
     }
 
     [RequireComponent(typeof(LockOnTarget))]
-    public class EnemyController : MonoBehaviour, IDamageable
+    public class EnemyController : MonoBehaviour, IDamageable, Core.IStreamingAnchor
     {
         [Header("Enemy Identity & Stats")]
         [SerializeField] private string enemyName = "Gezgin Kara Şövalye";

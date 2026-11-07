@@ -129,6 +129,8 @@ namespace SoulsRPG.Player
 
         private void Awake()
         {
+            // Tek oyuncu (PlayerStats ikinci kopyayı zaten siliyor; burada sadece referansı ezmeyelim)
+            if (Instance != null && Instance != this) return;
             Instance = this;
             characterController = GetComponent<CharacterController>();
             playerStats = GetComponent<PlayerStats>();
