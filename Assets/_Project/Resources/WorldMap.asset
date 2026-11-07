@@ -30,5 +30,5 @@ MonoBehaviour:
   - sceneName: Region_EskiMezarlik
     displayName: "Eski Mezarl\u0131k"
     bounds:
-      m_Center: {x: 49.637096, y: -3.5368347, z: -0.05492592}
-      m_Extent: {x: 52.137096, y: 16.965244, z: 31.719257}
+      m_Center: {x: 62.387096, y: -3.5368347, z: -0.05492592}
+      m_Extent: {x: 39.387096, y: 16.965244, z: 31.719257}

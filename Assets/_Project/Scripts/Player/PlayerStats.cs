@@ -93,6 +93,11 @@ namespace SoulsRPG.Player
         public string LastBonfireName { get; private set; }
         public string LastBonfireScene { get; private set; }
 
+        /// <summary>Karakter adı (New Game'de girilir, kayıtta tutulur).</summary>
+        public string CharacterName { get; private set; } = "";
+        /// <summary>Karakterin oluşturulduğu tarih (kayıtta tutulur).</summary>
+        public string CreatedAt { get; private set; } = "";
+
         // Yenilen boss'lar (kayıtta tutulur)
         private readonly System.Collections.Generic.HashSet<string> defeatedBosses = new System.Collections.Generic.HashSet<string>();
         public System.Collections.Generic.IEnumerable<string> DefeatedBosses => defeatedBosses;
@@ -374,6 +379,8 @@ namespace SoulsRPG.Player
 
             if (data != null)
             {
+                CharacterName = data.characterName ?? "";
+                CreatedAt = data.createdAt ?? "";
                 soulLevel = data.soulLevel;
                 currentSouls = data.currentSouls;
                 vigor = data.vigor;
